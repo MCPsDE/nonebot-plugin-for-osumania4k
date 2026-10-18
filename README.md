@@ -109,9 +109,14 @@ Copy-Item .env.example .env
 `.env` 中对应：
 
 ```dotenv
+DRIVER=~websockets
 ONEBOT_WS_URLS=["ws://127.0.0.1:3001"]
 ONEBOT_ACCESS_TOKEN=你设置的Token
 ```
+
+> OneBot v11 的正向 WebSocket 是机器人主动连接 NapCat，因此必须使用支持
+> WebSocket 客户端的驱动（`~websockets`）。使用 `~fastapi` 会提示
+> `does not support websocket client connections`，无法连接。
 
 ### 4.2 指令前缀
 
