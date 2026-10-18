@@ -1,4 +1,4 @@
-"""``/rework`` 指令解析与业务编排。"""
+"""``/rework2`` 指令解析与业务编排。"""
 
 from __future__ import annotations
 
@@ -35,11 +35,11 @@ logger = logging.getLogger(__name__)
 
 HELP_TEXT = (
     "【Rework 谱面分析】\n"
-    "/rework <谱面ID>       分析单张谱面\n"
-    "/rework bid<谱面ID>    同上（显式指定谱面，亦可 b<ID>）\n"
-    "/rework sid<谱包ID>    分析整个谱包（合并转发发送，亦可 s<ID>）\n"
-    "/rework <osu! 链接>   支持官网谱面 / 谱包链接\n"
-    "回复一条谱面文件并发送 /rework\n"
+    "/rework2 <谱面ID>       分析单张谱面\n"
+    "/rework2 bid<谱面ID>    同上（显式指定谱面，亦可 b<ID>）\n"
+    "/rework2 sid<谱包ID>    分析整个谱包（合并转发发送，亦可 s<ID>）\n"
+    "/rework2 <osu! 链接>   支持官网谱面 / 谱包链接\n"
+    "回复一条谱面文件并发送 /rework2\n"
     "  支持 .osu / .osz / .mc / .mcz，以及内含它们的 .zip（可嵌套）\n"
     "（仅支持 4K mania / Malody Key 4K 谱面）"
 )
@@ -71,7 +71,7 @@ class ResultItem:
 
 
 def parse_arguments(text: str) -> Command:
-    """解析 ``/rework`` 后面的参数（NoneBot 已剥离指令本身）。"""
+    """解析 ``/rework2`` 后面的参数（NoneBot 已剥离指令本身）。"""
     rest = text.strip()
     if not rest:
         return Command(kind="reply")
@@ -175,7 +175,7 @@ class ReworkService:
             logger.error("%s 渲染失败：%s", tag, exc)
             await bot.send(event, MessageSegment.text(f"渲染失败：{exc}"))
         except Exception as exc:  # noqa: BLE001
-            logger.exception("%s 处理 /rework 请求时发生异常", tag)
+            logger.exception("%s 处理 /rework2 请求时发生异常", tag)
             await bot.send(event, MessageSegment.text(f"处理失败：{exc}"))
 
     # ------------------------------------------------------------------ 谱面来源

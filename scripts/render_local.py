@@ -13,7 +13,7 @@ from pathlib import Path
 # 直接运行 scripts/ 下的文件时，把仓库根目录加入导入路径
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-# 插件包的 __init__ 会注册 /rework 处理器，需要先初始化 NoneBot
+# 插件包的 __init__ 会注册 /rework2 处理器，需要先初始化 NoneBot
 import nonebot
 
 nonebot.init()

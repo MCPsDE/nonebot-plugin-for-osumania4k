@@ -1,4 +1,4 @@
-"""``/rework`` 指令处理器与服务生命周期。"""
+"""``/rework2`` 指令处理器与服务生命周期。"""
 
 from __future__ import annotations
 
@@ -76,11 +76,11 @@ async def _shutdown() -> None:
     await close_service()
 
 
-rework = on_command("rework", rule=Rule(_allowed), priority=10, block=True)
+rework2 = on_command("rework", rule=Rule(_allowed), priority=1, block=True)
 
 
-@rework.handle()
-async def _handle_rework(
+@rework2.handle()
+async def _handle_rework2(
     bot: Bot,
     event: MessageEvent,
     args: Message = CommandArg(),

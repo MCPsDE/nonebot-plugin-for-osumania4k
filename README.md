@@ -1,9 +1,9 @@
 # nonebot-plugin-rework
 
-一个 **NoneBot2 + OneBot v11** 插件：在 QQ 里发送 `/rework`，即可得到一张
+一个 **NoneBot2 + OneBot v11** 插件：在 QQ 里发送 `/rework2`，即可得到一张
 **ManiaMapAnalyser by Leo_Black（tosu 插件）风格**的 osu!mania 4K 谱面分析卡片。
 
-本项目由 `fixed-density` 仓库的 `qqbot` 分支改造而来，只保留 `/rework` 指令的功能，
+本项目由 `fixed-density` 仓库的 `qqbot` 分支改造而来，只保留 `/rework2` 指令的功能，
 并把通信层从自建 OneBot 客户端迁移到 NoneBot2。仓库内自带渲染所需的
 ManiaMapAnalyser 前端插件，无需另外准备 tosu 环境即可独立运行。
 
@@ -13,11 +13,11 @@ ManiaMapAnalyser 前端插件，无需另外准备 tosu 环境即可独立运行
 
 | 用法 | 说明 |
 | --- | --- |
-| `/rework <谱面ID>` | 分析单张谱面，返回一张卡片图片 |
-| `/rework bid<谱面ID>` / `b<ID>` | 同上（`bid`、`b` 与数字之间可省略空格，写 `bid 123` 亦可） |
-| `/rework sid<谱包ID>` / `s<ID>` | 分析整个谱包，以**合并转发（聊天记录）**形式发送多张图片 |
-| `/rework <osu! 链接>` | 支持 `osu.ppy.sh/beatmapsets/...`、`/beatmaps/...`、`/b/...`、`/s/...` |
-| 回复谱面文件并发送 `/rework` | 支持 `.osu` / `.osz` / `.mc` / `.mcz`，以及任意 `.zip`（可嵌套） |
+| `/rework2 <谱面ID>` | 分析单张谱面，返回一张卡片图片 |
+| `/rework2 bid<谱面ID>` / `b<ID>` | 同上（`bid`、`b` 与数字之间可省略空格，写 `bid 123` 亦可） |
+| `/rework2 sid<谱包ID>` / `s<ID>` | 分析整个谱包，以**合并转发（聊天记录）**形式发送多张图片 |
+| `/rework2 <osu! 链接>` | 支持 `osu.ppy.sh/beatmapsets/...`、`/beatmaps/...`、`/b/...`、`/s/...` |
+| 回复谱面文件并发送 `/rework2` | 支持 `.osu` / `.osz` / `.mc` / `.mcz`，以及任意 `.zip`（可嵌套） |
 
 **容器读取**：`.osz` / `.mcz` / `.zip` 统一按 zip 处理，递归遍历包内所有目录，
 收集 `.osu`、`.mc`，并对嵌套压缩包继续展开（最多 4 层，含条目数与解压体积上限）。
@@ -41,7 +41,7 @@ nonebot-plugin-rework/
 ├─ README.md
 └─ nonebot_plugin_rework/
    ├─ __init__.py               # 插件元信息
-   ├─ handler.py                # /rework 指令与服务生命周期
+   ├─ handler.py                # /rework2 指令与服务生命周期
    ├─ service.py                # 指令解析、下载、渲染、发送
    ├─ config.py                 # 插件配置与运行时配置
    ├─ beatmap.py                # .osu 解析与 4K mania 校验
@@ -120,7 +120,7 @@ ONEBOT_ACCESS_TOKEN=你设置的Token
 
 ### 4.2 指令前缀
 
-`/rework` 是 NoneBot 的指令名，前缀由 `COMMAND_START` 控制：
+`/rework2` 是 NoneBot 的指令名，前缀由 `COMMAND_START` 控制：
 
 ```dotenv
 COMMAND_START=["/"]
@@ -165,7 +165,7 @@ REWORK_BEATMAP_URL=https://catboy.best/osu/{id}
 REWORK_BEATMAPSET_URL=https://catboy.best/d/{id}
 ```
 
-> `/rework <ID>` 需要机器人所在机器能访问外网镜像；回复文件的方式完全离线可用。
+> `/rework2 <ID>` 需要机器人所在机器能访问外网镜像；回复文件的方式完全离线可用。
 
 ---
 
@@ -177,7 +177,7 @@ python bot.py
 ```
 
 看到 NoneBot 启动日志、OneBot 连接成功后，在 QQ 里私聊机器人，或在群里发送
-`/rework 129891` 试一下。
+`/rework2 129891` 试一下。
 
 调试时可在 `.env` 中调高日志级别：
 
@@ -266,10 +266,10 @@ python scripts\render_local.py .\pack.osz --out .\temp
 接好 QQ 后，可以直接发送：
 
 ```text
-/rework 129891
-/rework bid129891
-/rework s123456
-/rework https://osu.ppy.sh/beatmapsets/123456#mania/129891
+/rework2 129891
+/rework2 bid129891
+/rework2 s123456
+/rework2 https://osu.ppy.sh/beatmapsets/123456#mania/129891
 ```
 
 ---
@@ -280,7 +280,7 @@ python scripts\render_local.py .\pack.osz --out .\temp
   `REWORK_BROWSER_CHANNEL` 设为 `"msedge"`。
 - **端口被占用**：修改 `REWORK_RENDER_PORT`（避开 tosu 的 24050）。
 - **截图里是别的谱面**：确认没有另一个实例占用同一 `REWORK_RENDER_PORT`。
-- **`/rework <ID>` 报「镜像站返回的不是谱面文件」**：镜像限流或 ID 不存在，
+- **`/rework2 <ID>` 报「镜像站返回的不是谱面文件」**：镜像限流或 ID 不存在，
   换镜像或改用回复文件。
 - **谱包很大时很久**：谱面逐张串行渲染，可用 `REWORK_MAX_BEATMAPS_PER_PACK` 限制。
 - **改了插件设置后图片没变**：这是哈希缓存的正常行为，删除 `data/charts/` 下
@@ -293,7 +293,7 @@ python scripts\render_local.py .\pack.osz --out .\temp
 ## 9. 与 qqbot 分支的差异
 
 - 通信层使用 **NoneBot2 + nonebot-adapter-onebot**，不再自带 OneBot 客户端。
-- 仅保留 `/rework` 指令，移除了 `/report` 反馈与发送消息索引。
+- 仅保留 `/rework2` 指令，移除了 `/report` 反馈与发送消息索引。
 - 配置从 `config.json` 改为 `.env` 中的 `REWORK_*` 变量。
 - 仓库内自带 ManiaMapAnalyser 前端插件，克隆后即可运行。
 - 谱面解析、Malody 转换、缓存、渲染与截图逻辑保持一致。

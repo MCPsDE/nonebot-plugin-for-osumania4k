@@ -4,7 +4,11 @@ import { applyCompanellaToMixedResult } from "../estimator/mixedEstimator.js";
 import { rcLabelToNumeric } from "../estimator/rcDifficultyFormat.js";
 import { classifyCompanellaDifficulty } from "../estimator/companellaEstimator.js";
 import { calculateInterludeStar } from "../interlude/index.js";
-import { calculateFixedDensity } from "../fixedDensity/index.js";
+import {
+    calculateFixedDensity,
+    fixedDensityLnLabel,
+    fixedDensityRcLabel,
+} from "../fixedDensity/index.js";
 import { analyzePatternFromText } from "../patterns/service.js";
 import { OsuFileParser } from "../parser/osuFileParser.js";
 import { runInWorker } from "./worker/manager.js";
@@ -936,7 +940,16 @@ export async function fetchBeatmapFile(reason) {
                 }, { skip: isMetaDegraded });
             }
 
-            if (Number.isFinite(resolvedNumericDifficulty) && resolvedNumericDifficulty >= 18.5) {
+            const fixedDensityDifficultyText = state.srText === "Fixed Density v1"
+                ? [
+                    fixedDensityRcLabel(fixedDensityValue),
+                    fixedDensityLnLabel(fixedDensityLnValue),
+                ].filter(Boolean).join("\n")
+                : "";
+
+            if (fixedDensityDifficultyText) {
+                setEstimateDifficultyText(fixedDensityDifficultyText);
+            } else if (Number.isFinite(resolvedNumericDifficulty) && resolvedNumericDifficulty >= 18.5) {
                 if (resolvedEstDiff) {
                     const strList = resolvedEstDiff.split("||");
                     strList[0] = "> Cloverwisp Theta high";
