@@ -45,7 +45,7 @@
 - 安装器工程：`malodyv_tools/installer`；单文件发布：`malodyv_tools/release/MalodyV.BepInExInstaller.exe`（自包含、压缩）。
 - 安装器从 BepInEx 官方 bleeding-edge 页面动态选择最新 Windows x64 IL2CPP 归档，并先检测 WebView2 Runtime；缺失时通过 Microsoft HTTPS 引导程序安装并验证运行时注册项。BepInEx 归档下载到游戏目录下的临时目录，校验 ZIP 路径并确认核心 DLL 存在，再替换运行时；失败时恢复旧运行时。替换前拒绝游戏仍在运行、目标目录是 reparse point 的情况。
 - 覆盖 `BepInEx` 时会把旧 `BepInEx/plugins` 原目录移动到新运行时，其他运行时文件按归档重建。当前机器现有的 `MalodyVThemeLoader` 因此会保留。安装器成品已构建，但没有运行它覆盖当前 `6.0.0-be.785` 安装。
-- Overlay 发布目录：`malodyv_tools/release/MalodyVReworkOverlayFramework`；已部署至 `E:\Program Files (x86)\Steam\steamapps\common\MalodyV\BepInEx\plugins\MalodyVReworkOverlay`，插件 DLL 与伴侣程序位于同一目录。
+- Overlay 发布目录：`malodyv_tools/overlay/release/MalodyVReworkOverlay`；BepInEx 插件 DLL 必须放在 `BepInEx\plugins` 根目录，伴侣程序与 Bot 目录放在 `BepInEx\plugins\MalodyVReworkOverlay` 子目录。此前把 DLL 和伴侣程序全部放进子目录时，目标 BepInEx 日志出现 `0 assemblies discovered`，因此发布脚本现在按该布局输出。
 - 游戏内插件以 .NET 6 编译，运行于 BepInEx IL2CPP；独立 WPF/WebView2 伴侣使用 framework-dependent .NET 8，提供管理窗口和透明置顶卡片。本机已安装 .NET 8 Desktop Runtime 和 WebView2 Runtime。卡片 HTML/CSS/JS、字体、WASM、ONNX 与参考算法源码一起打包，页面由本地 HTTP 服务供 WebView2 加载。
 - Overlay 关闭 WebSocket、联网更新和遥测；本地服务提供谱面文本、设置、背景图、参考难度与分析选项端点。页面复用当前卡片实现，不另画一套 UI。
 - `ItemChart.OnPointerClick` 覆盖鼠标选择，`ItemChart.SetSelected` 覆盖列表键盘选择，`SceneChart.OnClose` 清除卡片。IPC 使用本地命名管道 `MalodyV.ReworkOverlay.Selection`。游戏侧只在 `FilePath + IndexInFile + DisplayVersion` 变化时发送更新，伴侣在新选择到达时重载分析。
@@ -63,12 +63,13 @@
 - BepInEx 游戏插件自身计算其程序集 SHA-256，并读取独立仓库 `manifest.json` 对照版本与哈希；不一致时通过本地管道通知管理窗口显示可关闭提示。伴侣程序另行检查自身 EXE 哈希。提示不阻止游戏或卡片继续使用。
 - HTTPS 与 SHA-256 可发现传输损坏及归档/manifest 不一致，但 manifest 和归档来自同一 GitHub 账号，并非数字签名。如果仓库或账号被接管，攻击者可以同时替换内容与哈希；因此自动同步应限定信任固定个人仓库，并审阅提交。远程卡片 JavaScript 会在 WebView 中执行，这是卡片渲染本身所需的信任边界。
 - 发布前运行 `scripts/Update-BepInExBotManifest.ps1` 更新 Bot 仓库 manifest；然后从 Bot 仓库构建 `malodyv_tools/overlay/Build-Release.ps1`，提交 overlay 仓库内随包的原始插件目录、插件 DLL 哈希 manifest 和宿主代码。不要用 `git pull` 替换运行目录，也不要删除 `BepInEx/plugins`。
+- `BepInEx` 的生成缓存 `cache/chainloader_typeloader.dat` 可能保留旧扫描结果；更新插件后若日志仍显示 `0 assemblies discovered`，先把该生成文件移到备份名再启动，让 Chainloader 重建缓存，不要删除其他插件。
 
 ## 验证边界
 
 - 安装器、伴侣窗口和 IL2CPP 插件源码均已本机编译；安装器 EXE、framework-dependent 伴侣程序与插件 DLL 随发布生成。
-- 插件包已直接部署到当前 MalodyV 的 `BepInEx/plugins/MalodyVReworkOverlay`；部署前后核对 `MalodyVThemeLoader` 文件 SHA-256，未改变现有主题插件。当前 BepInEx `6.0.0-be.785` 未被安装器覆盖。
-- 安装器、伴侣程序、插件均已构建；Python 6 项单元测试、Node 8 项管线测试通过，聊天插件的合成 5K Malody 谱完成 PNG 渲染。尚未启动伴侣执行 IPC 冒烟，也未启动 MalodyV 验证 Harmony hook、透明窗口层级和游戏内切图；启动后检查 `BepInEx/LogOutput.log` 的 `MalodyV Rework Overlay` 加载记录。若 interop 方法与 `.785` 不匹配，先核实日志，不要删除其他插件。
+- 当前部署保留了旧 Overlay 子目录和生成缓存的带时间戳备份，新的 DLL 位于 `BepInEx/plugins/MalodyV.ReworkOverlay.Plugin.dll`，伴侣程序位于 `BepInEx/plugins/MalodyVReworkOverlay`；部署前后未改变现有 `MalodyVThemeLoader` 文件。当前 BepInEx `6.0.0-be.785` 未被安装器覆盖。
+- 安装器、伴侣程序、插件均已构建；Python 8 项单元测试、Node 8 项管线测试通过，伴侣窗口启动冒烟通过。游戏启动验证已确认 BepInEx 运行，但本轮启动在 Chainloader 完成前结束，尚未完成新 DLL 的实际选谱与 mod 切换回归；后续应等待日志出现 `Chainloader startup complete` 和 `Loading [MalodyV Rework Overlay 1.3.0]` 后再操作选谱界面。
 
 ## 维护约束
 
