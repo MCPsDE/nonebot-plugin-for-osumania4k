@@ -19,9 +19,9 @@
 - `Assets/Malody/Scripts/Play/PlayInfo.cs` 提供静态 `PlayInfo.Local`。
 - `Assets/Malody/Scripts/Framework/Chart/ChartData/Chart.cs` 暴露 `MaChart.FilePath` 与 `MaChart.IndexInFile`。
 
-独立插件通过 Harmony postfix 监听 `ItemChart.OnPointerClick` 和 `ItemChart.SetSelected`，从选中项的 `Chart` 读取 `FilePath`、`IndexInFile`、`DisplayVersion`；`SceneChart.OnClose` 清除选择。IPC 只在 `FilePath + IndexInFile + DisplayVersion` 身份改变时发送，因此鼠标和键盘切换都会刷新、不会每帧重复渲染。游戏源码中的 `PlayInfo.Local.Chart` 是当前选择的另一处可核对来源。
+独立插件通过 Harmony postfix 监听 `ItemChart.OnPointerClick` 和 `ItemChart.SetSelected`，从选中项的 `Chart` 读取 `FilePath`、`IndexInFile`、`DisplayVersion`；`SceneChart.OnClose` 清除选择。启动时只读一次当前状态，之后仅由选谱、Mod/Turbo 面板关闭、联机配置和场景状态 Harmony 事件触发。没有 `Update()`、协程轮询或逐帧读取；IPC 只在谱面或分析签名改变时发送。重分析在伴侣进程异步执行，不占用游戏帧。
 
-当前插件还读取 `PlayInfo.Local.Mod`、`customJudge.audioSpeed`、`playMode` 和 `RandomSeed`。Mod 面板/Turbo 面板关闭以及联机房间配置更新时主动重发，且 mod 位图、有效速度、模式和随机种子纳入选择签名，所以同图切换 mod 会更新分析。普通 Rush/Dash/Slow 分别按游戏 `PlayInfo.PlaySpeed` 语义使用 1.5/1.2/0.8；Turbo 自定义 `audioSpeed` 优先，Holds 与速率 mod 同时启用时按游戏 `Validate()` 的转移规则取速率 mod。
+当前插件读取 `PlayInfo.Local.Mod`、`customJudge.audioSpeed`、`playMode` 和 `RandomSeed`。对活动 Mod 调用游戏自身的 `PlayUtil.CanPlayMod`，排除当前模式不能使用的位；Mod/Turbo 面板关闭以及联机房间配置更新时主动重发，且有效 Mod、速度、模式和随机种子纳入选择签名，所以同图切换配置会更新分析。普通 Rush/Dash/Slow 分别按游戏 `PlayInfo.PlaySpeed` 语义使用 1.5/1.2/0.8；Turbo 使用 `audioSpeed`，Holds 与速率 Mod 同时启用时按游戏 `Validate()` 的优先级取速率 Mod。此 Mod 过滤入口只在首次配置事件反射解析并缓存，不做持续扫描。
 
 宿主在 `.osu` 输入上应用与 Key/Cube processor 对应的内容变化：Flip/Invert/Luck 轨道映射、Less 按起始拍的约分分母过滤、Thumb 按列数种子和活跃长条处理、Taps 把长条转单击、Holds 按同轨下一音符和 1/4 拍规则将单击转成长条。Fixed Density 曲线、RC/LN 数值和 Sunny/官方星数均使用转换后的谱面；速率传入各自的时间尺度计算。非 Key 的内容变化不擅自套用 mania 转换。
 
@@ -46,12 +46,12 @@
 - 安装器从 BepInEx 官方 bleeding-edge 页面动态选择最新 Windows x64 IL2CPP 归档，并先检测 WebView2 Runtime；缺失时通过 Microsoft HTTPS 引导程序安装并验证运行时注册项。BepInEx 归档下载到游戏目录下的临时目录，校验 ZIP 路径并确认核心 DLL 存在，再替换运行时；失败时恢复旧运行时。替换前拒绝游戏仍在运行、目标目录是 reparse point 的情况。
 - 覆盖 `BepInEx` 时会把旧 `BepInEx/plugins` 原目录移动到新运行时，其他运行时文件按归档重建。当前机器现有的 `MalodyVThemeLoader` 因此会保留。安装器成品已构建，但没有运行它覆盖当前 `6.0.0-be.785` 安装。
 - Overlay 发布目录：`malodyv_tools/overlay/release/MalodyVReworkOverlay`；BepInEx 插件 DLL 必须放在 `BepInEx\plugins` 根目录，伴侣程序与 Bot 目录放在 `BepInEx\plugins\MalodyVReworkOverlay` 子目录。此前把 DLL 和伴侣程序全部放进子目录时，目标 BepInEx 日志出现 `0 assemblies discovered`，因此发布脚本现在按该布局输出。
-- 游戏内插件以 .NET 6 编译，运行于 BepInEx IL2CPP；独立 WPF/WebView2 伴侣使用 framework-dependent .NET 8，提供管理窗口和透明置顶卡片。本机已安装 .NET 8 Desktop Runtime 和 WebView2 Runtime。卡片 HTML/CSS/JS、字体、WASM、ONNX 与参考算法源码一起打包，页面由本地 HTTP 服务供 WebView2 加载。
+- 游戏内插件以 .NET 6 编译，运行于 BepInEx IL2CPP；独立 WPF/WebView2 伴侣使用 self-contained .NET 8，提供管理窗口和透明置顶卡片，不依赖目标机器预装 .NET Desktop Runtime。卡片 HTML/CSS/JS、字体、WASM、ONNX、portable Python、NumPy 与参考算法源码一起打包，页面由本地 HTTP 服务供 WebView2 加载。
 - Overlay 关闭 WebSocket、联网更新和遥测；本地服务提供谱面文本、设置、背景图、参考难度与分析选项端点。页面复用当前卡片实现，不另画一套 UI。
 - `ItemChart.OnPointerClick` 覆盖鼠标选择，`ItemChart.SetSelected` 覆盖列表键盘选择，`SceneChart.OnClose` 清除卡片。IPC 使用本地命名管道 `MalodyV.ReworkOverlay.Selection`。游戏侧只在 `FilePath + IndexInFile + DisplayVersion` 变化时发送更新，伴侣在新选择到达时重载分析。
 - `.mcz` 本质上是包含多张谱面及多个模式的 ZIP。同一容器路径可能对应不同难度；不能按 ZIP 首项或仅按路径选图。Overlay 先用游戏提供的 `DisplayVersion` 对照内部 `.mc`/`.osu` 的难度名，`IndexInFile` 作为版本信息缺失时的回退索引。
 - Overlay 转换 `.mc` 为页面所需的 `.osu` 输入；Key 模式保持 mania，Catch/Taiko 使用相应 osu! mode，其余 Malody 模式降级为可渲染的通用卡片输入。`.osu`、`.mc` 以及包含这些文件的 `.mcz`/`.zip`/`.osz` 已实现；独立 `.tja`、BMS 等尚未无损转换。
-- SunnyRework/OsuSR 由随包的同目录 toolkit 算法计算。参考结果需要系统 Python（PATH 中的 `python`）和 NumPy；管理窗口可配置解释器与 toolkit 路径。没有 Python 或计算失败时标签显示 `-`。本机 Python 3.12 与 NumPy 2.4.4 已完成计算冒烟测试。
+- SunnyRework/OsuSR 由随包 toolkit 计算，随包 portable Python 3.10 和 NumPy 2.2.6 提供运行环境；管理窗口不再暴露 Python 或算法目录路径，安装使用不依赖用户系统 Python。分析仅在选谱或 Mod/Turbo 状态改变后于伴侣进程启动一次；异常或超时时返回空参考值，不阻塞游戏线程。
 - WebView2 Evergreen Runtime 是伴侣窗口依赖。安装器会自动补装缺失运行时；若用户跳过本安装器单独部署插件，则需要自行安装 WebView2 Runtime。
 
 ## Bot 插件目录与自动同步
@@ -69,11 +69,13 @@
 
 - 安装器、伴侣窗口和 IL2CPP 插件源码均已本机编译；安装器 EXE、framework-dependent 伴侣程序与插件 DLL 随发布生成。
 - 当前部署保留了旧 Overlay 子目录和生成缓存的带时间戳备份，新的 DLL 位于 `BepInEx/plugins/MalodyV.ReworkOverlay.Plugin.dll`，伴侣程序位于 `BepInEx/plugins/MalodyVReworkOverlay`；部署前后未改变现有 `MalodyVThemeLoader` 文件。当前 BepInEx `6.0.0-be.785` 未被安装器覆盖。
-- 安装器、伴侣程序、插件均已构建；Python 8 项单元测试、Node 8 项管线测试通过，伴侣窗口启动冒烟通过。游戏启动验证已确认 BepInEx 运行，但本轮启动在 Chainloader 完成前结束，尚未完成新 DLL 的实际选谱与 mod 切换回归；后续应等待日志出现 `Chainloader startup complete` 和 `Loading [MalodyV Rework Overlay 1.3.0]` 后再操作选谱界面。
+- 2026-10-20 构建游戏插件、self-contained 伴侣、安装器工程均通过，0 warning / 0 error；8 项 Node 测试及 8 项 Python 测试（另 7 个子测试）通过。portable Python 3.10.20 + NumPy 2.2.6 对真实 `.osu` 谱面完成 SunnyRework/OsuSR 冒烟（自定义 1.2x 速度）；冒烟首次发现 toolkit parser 依赖 `nonebot.log`，现由 `ReferenceMetrics.py` 提供无操作 logger shim，算法不依赖用户安装 NoneBot。发布 DLL、Host 与 `manifest.json` 哈希一致；Bot 源目录、随包目录和远程 manifest SHA-256 均为 `D072B477...2D6D1`。
+- 同日仅部署 `MalodyV.ReworkOverlay.Plugin.dll` 与专属 `BepInEx/plugins/MalodyVReworkOverlay` 目录；部署前确认游戏和伴侣进程均未运行，部署后 `MalodyVThemeLoader` 目录哈希未变。没有替换 BepInEx，也没有删除/重建 `BepInEx/plugins`。
+- 未为本轮回归启动游戏，避免节奏游玩期间产生额外 CPU/IO 负担；因此 IL2CPP 运行时 Hook、Mod/Turbo 切换与结算显隐仍待下次正常进入大厅/房间时观察。游戏侧只在选谱、Mod/Turbo 面板关闭、房间配置和场景事件时处理，不做逐帧/定时轮询；伴侣分析在独立进程执行。
 
 ## 维护约束
 
 - `Emiria` 仅作只读参考。
-- overlay 在谱面身份或 `PlayInfo.Local` 的分析相关 mod 状态变化时重算。
+- overlay 在谱面身份或 `PlayInfo.Local` 的有效分析 Mod/Turbo 状态事件变化时重算；禁止逐帧或定时轮询游戏状态。
 - 管理窗口与游戏顶层卡片窗口由 companion 程序提供；继续复用现有 HTML/CSS/JS 页面。
 - 若需支持 `.tja`、BMS 等额外格式，必须先按 `IndexInFile` 解析对应难度并转换，不能把不同模式的 notes 合并。
