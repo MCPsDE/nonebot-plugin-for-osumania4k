@@ -56,7 +56,7 @@
                         </svg>
                         <div id="rework-diff-graph-error" class="star-graph-error" hidden>Graph unavailable</div>
                     </div>
-                    <div class="star-caption" id="est-diff-caption">Estimate Difficulty</div>
+                    <div class="star-caption" id="est-diff-caption">SunnyRework:-|OsuSR:-</div>
                 </div>
                 <div class="star-tip" id="star-tip" hidden>
                     <span class="star-dot" data-level="5"></span>
@@ -66,6 +66,34 @@
                     <span class="star-dot" data-level="1"></span>
                 </div>
                 </div>
+            </div>
+
+            <div class="profile-graph-wrap" id="profile-graph-wrap" hidden>
+                <div class="profile-graph-head">
+                    <span class="profile-graph-title">Difficulty profile</span>
+                    <div class="profile-graph-legend" aria-hidden="true">
+                        <span class="profile-graph-legend-item"><i class="profile-graph-swatch profile-graph-swatch-rc"></i>RC</span>
+                        <span class="profile-graph-legend-item"><i class="profile-graph-swatch profile-graph-swatch-ln"></i>LN</span>
+                    </div>
+                </div>
+                <svg id="profile-graph" class="profile-graph" viewBox="0 0 260 132" preserveAspectRatio="none" aria-label="RC and LN difficulty profile" role="img">
+                    <g class="profile-graph-grid" aria-hidden="true">
+                        <line x1="8" y1="14" x2="252" y2="14"></line>
+                        <line x1="8" y1="59" x2="252" y2="59"></line>
+                        <line x1="8" y1="104" x2="252" y2="104"></line>
+                        <line x1="8" y1="104" x2="252" y2="104" class="profile-graph-baseline"></line>
+                    </g>
+                    <path id="profile-graph-rc-fill" class="profile-graph-rc-fill" d=""></path>
+                    <path id="profile-graph-rc-upper" class="profile-graph-line profile-graph-line-rc-edge" d=""></path>
+                    <path id="profile-graph-rc-lower" class="profile-graph-line profile-graph-line-rc-edge" d=""></path>
+                    <path id="profile-graph-rc-line" class="profile-graph-line profile-graph-line-rc" d=""></path>
+                    <path id="profile-graph-ln-line" class="profile-graph-line profile-graph-line-ln" d=""></path>
+                </svg>
+                <div class="profile-graph-axis">
+                    <span>0:00</span>
+                    <span id="profile-graph-duration">0:00</span>
+                </div>
+                <span class="profile-graph-max" id="profile-graph-max">0.0</span>
             </div>
 
             <div class="full-separator" id="sep-pattern" hidden>Pattern</div>

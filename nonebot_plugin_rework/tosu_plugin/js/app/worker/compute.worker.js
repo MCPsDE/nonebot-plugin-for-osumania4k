@@ -18,7 +18,7 @@ const ESTIMATORS = { Sunny: "Sunny", Daniel: "Daniel", Azusa: "Azusa", Roxy: "Ro
 self.onmessage = (event) => {
     const data = event.data || {};
 
-    // pipeline 消息：整段分析（解析/分派/归一化/SunnyWindow/派生/Interlude/Pattern/Ett/Companella 二次 Ett）
+    // pipeline message: parse, estimators, derived values, pattern, Ett, and companions
     // 一次往返。runAnalysisPipeline 是异步的（ett WASM + interlude），结果经 then 回传。
     if (data.type === "pipeline") {
         const { id, input } = data;

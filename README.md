@@ -1,7 +1,8 @@
 # nonebot-plugin-rework
 
 一个 **NoneBot2 + OneBot v11** 插件：在 QQ 里发送 `/rework2`，即可得到一张
-**ManiaMapAnalyser by Leo_Black（tosu 插件）风格**的 osu!mania 4K 谱面分析卡片。
+**ManiaMapAnalyser by Leo_Black（tosu 插件）风格**的 osu! 谱面分析卡片。固定密度 RC/LN
+估算仅对 4K mania 启用；Malody Key 谱面支持 1–18K 卡片转换。
 
 本项目由 `fixed-density` 仓库的 `qqbot` 分支改造而来，只保留 `/rework2` 指令的功能，
 并把通信层从自建 OneBot 客户端迁移到 NoneBot2。仓库内自带渲染所需的
@@ -23,11 +24,16 @@ ManiaMapAnalyser 前端插件，无需另外准备 tosu 环境即可独立运行
 收集 `.osu`、`.mc`，并对嵌套压缩包继续展开（最多 4 层，含条目数与解压体积上限）。
 同一包内重复的谱面会按内容去重。
 
-**Malody 支持**：`.mc` / `.mcz` 会先按 **模式 + 轨道数** 校验，再转换为一份临时
-`.osu`（物件时间戳保留浮点毫秒）后交给渲染器。
+**Malody 支持**：`.mc` / `.mcz` 的 Key 模式会先校验轨道数（1–18K），再转换为一份临时
+`.osu`（物件时间戳保留浮点毫秒）后交给渲染器；非 Key 模式不由聊天插件转换。
 
-**容错行为**：轨道数不是 4、或不是 osu!mania 谱面时，该张谱面的卡片会被替换为
-错误提示图片；其余谱面照常输出。单张渲染失败也只会替换那一张，不会中断整包。
+**多模式卡片**：osu!standard、osu!taiko、osu!catch、非 4K mania 和 4K mania 均可生成
+分析卡片。左上角 RC/LN 固定密度值只在 4K mania 上计算；其他模式或键数显示 `-`，
+右上段位估计回退为参考插件可提供的 Sunny 结果。
+
+**容错行为**：缺少 `[HitObjects]` 的无效 osu! 文件会替换为错误提示图片；单张渲染失败
+也只会替换那一张，不会中断整包。Malody 转换边界与历史坑见
+[`MALODYV_OVERLAY_NOTES.md`](MALODYV_OVERLAY_NOTES.md)。
 
 ---
 
@@ -44,7 +50,7 @@ nonebot-plugin-rework/
    ├─ handler.py                # /rework2 指令与服务生命周期
    ├─ service.py                # 指令解析、下载、渲染、发送
    ├─ config.py                 # 插件配置与运行时配置
-   ├─ beatmap.py                # .osu 解析与 4K mania 校验
+   ├─ beatmap.py                # .osu 解析与模式准入校验
    ├─ archive.py                # .osz/.mcz/.zip 递归扫描
    ├─ malody.py                 # .mc 解析与转换为 .osu
    ├─ osu_source.py             # 镜像下载 / 链接解析
@@ -241,8 +247,8 @@ tosu 的 WebSocket 断连只会在后台重试。因此本项目：
 
 ### 6.2 谱面库缓存
 
-每次查询都会把**最终用于分析的 `.osu` 文本**做 SHA-256 作为键，落盘到
-`data/charts/`。再次查询到同一谱面时（包括来自不同谱包、改了文件名的同一份内容）
+每次查询都会将**最终用于分析的 `.osu` 文本与渲染参数**组合后做 SHA-256，落盘到
+`data/charts/`。再次查询到同一谱面与参数时（包括来自不同谱包、改了文件名的同一份内容）
 直接复用已有图片，不再渲染。想强制重算，删除对应文件即可。
 
 ---

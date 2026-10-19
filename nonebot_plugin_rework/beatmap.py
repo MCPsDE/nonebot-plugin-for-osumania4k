@@ -1,7 +1,8 @@
 """osu! 谱面文本的轻量解析与准入校验。
 
 只需要读取 [General] / [Metadata] / [Difficulty] / [Events] 几个节，不解析
-HitObjects —— 真正的分析由 tosu 插件的前端完成。
+HitObjects —— 真正的分析由 tosu 插件的前端完成。所有 osu! 模式都可渲染卡片，
+RC/LN 固定密度估算只对 4K mania 启用。
 """
 
 from __future__ import annotations
@@ -10,8 +11,6 @@ import re
 from dataclasses import dataclass
 
 MANIA_MODE = 3
-SUPPORTED_KEYS = 4
-
 _SECTION_RE = re.compile(r"^\[(.+)\]$")
 
 
@@ -50,9 +49,10 @@ def _parse_float(value: str, default: float) -> float:
 
 
 def parse_beatmap(text: str) -> BeatmapInfo:
-    """解析谱面文本并校验是否为 4K mania。
+    """解析谱面文本并校验其是否包含可渲染的 HitObjects。
 
-    error 非空时表示该谱面不可分析，其内容即为给用户看的错误提示。
+    非 mania 与非 4K mania 仍可生成卡片；其固定密度 RC/LN 会显示为不可用。
+    error 非空时表示输入不是可渲染的 osu! 谱面，其内容即为错误提示。
     """
     info = BeatmapInfo()
     section = ""
@@ -108,20 +108,8 @@ def parse_beatmap(text: str) -> BeatmapInfo:
         info.error = "该文件不包含 [HitObjects] 段落，不是有效的 osu! 谱面文件。"
         return info
 
-    if info.mode != MANIA_MODE:
-        info.error = (
-            f"该谱面不是 osu!mania 模式（Mode={info.mode}），本工具仅支持 mania 谱面。"
-        )
-        return info
-
-    if info.column_count is None:
+    if info.mode == MANIA_MODE and info.column_count is None:
         info.error = "该谱面缺少 CircleSize 字段，无法判断轨道数。"
-        return info
-
-    if info.column_count != SUPPORTED_KEYS:
-        info.error = (
-            f"该谱面为 {info.column_count}K，本工具仅支持 4K mania 谱面。"
-        )
         return info
 
     return info

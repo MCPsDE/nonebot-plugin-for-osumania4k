@@ -54,8 +54,11 @@ class ChartCache:
 
     # ------------------------------------------------------------------ 键
     @staticmethod
-    def key_for(osu_text: str) -> str:
-        return hashlib.sha256(normalize_text(osu_text).encode("utf-8")).hexdigest()
+    def key_for(osu_text: str, variant: str = "") -> str:
+        # Version the image namespace so UI/data changes cannot reuse old cards.
+        payload = normalize_text(osu_text) + "\n\0" + str(variant)
+        digest = hashlib.sha256(payload.encode("utf-8")).hexdigest()
+        return f"v2-{digest}"
 
     def _paths(self, key: str) -> tuple[Path, Path, Path, Path]:
         return (

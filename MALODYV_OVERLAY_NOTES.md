@@ -1,0 +1,78 @@
+# MalodyV Overlay 技术记录
+
+本文记录当前卡片模式、MalodyV 选谱接口、BepInEx 安装器与独立 overlay 的实现及踩坑。
+`E:\UnityProjects\Emiria` 仅作只读参考，没有修改游戏源码。
+
+## 当前卡片模式行为
+
+- `.osu` 的 standard、taiko、catch、任意键数 mania 都可进入卡片渲染。
+- Fixed Density RC/LN 只对 4K mania 计算；其他模式或键数显示 `-`。
+- 非 4K mania 与非 mania 的右上段位估计取同目录参考插件提供的 Sunny 段位文本；若参考算法不支持该模式，结果自然显示 `-`。
+- 聊天插件的 `.mc` 转换器接受 Malody Key 模式 1–18K，不接受旧版数组式音符格式或非 Key 模式。5K 转成 `.osu` 后仍是 card-only：RC/LN 显示 `-`，右上段位尝试使用 Sunny 参考结果。
+
+## MalodyV 选谱来源
+
+只读参考源码位于 `E:\UnityProjects\Emiria`，本轮没有修改该目录。
+
+- `Assets/Malody/Scripts/Scene/Item/ItemChart.cs` 在选择谱面时发送 `Notification.Type.ChangeChart`，数据是 `MaChart`。
+- `Assets/Malody/Scripts/Scene/SceneChart.cs` 收到该通知后将谱面写入 `PlayInfo.Local.Chart`。
+- `Assets/Malody/Scripts/Play/PlayInfo.cs` 提供静态 `PlayInfo.Local`。
+- `Assets/Malody/Scripts/Framework/Chart/ChartData/Chart.cs` 暴露 `MaChart.FilePath` 与 `MaChart.IndexInFile`。
+
+独立插件通过 Harmony postfix 监听 `ItemChart.OnPointerClick` 和 `ItemChart.SetSelected`，从选中项的 `Chart` 读取 `FilePath`、`IndexInFile`、`DisplayVersion`；`SceneChart.OnClose` 清除选择。IPC 只在 `FilePath + IndexInFile + DisplayVersion` 身份改变时发送，因此鼠标和键盘切换都会刷新、不会每帧重复渲染。游戏源码中的 `PlayInfo.Local.Chart` 是当前选择的另一处可核对来源。
+
+当前插件还读取 `PlayInfo.Local.Mod`、`customJudge.audioSpeed`、`playMode` 和 `RandomSeed`。Mod 面板/Turbo 面板关闭以及联机房间配置更新时主动重发，且 mod 位图、有效速度、模式和随机种子纳入选择签名，所以同图切换 mod 会更新分析。普通 Rush/Dash/Slow 分别按游戏 `PlayInfo.PlaySpeed` 语义使用 1.5/1.2/0.8；Turbo 自定义 `audioSpeed` 优先，Holds 与速率 mod 同时启用时按游戏 `Validate()` 的转移规则取速率 mod。
+
+宿主在 `.osu` 输入上应用与 Key/Cube processor 对应的内容变化：Flip/Invert/Luck 轨道映射、Less 按起始拍的约分分母过滤、Thumb 按列数种子和活跃长条处理、Taps 把长条转单击、Holds 按同轨下一音符和 1/4 拍规则将单击转成长条。Fixed Density 曲线、RC/LN 数值和 Sunny/官方星数均使用转换后的谱面；速率传入各自的时间尺度计算。非 Key 的内容变化不擅自套用 mania 转换。
+
+## 格式与解析边界
+
+- `FilePath` 是文件路径，不保证文件本身只包含当前这一张难度。`IndexInFile` 对 SM/TJA 等多难度文件尤其重要，不能只按路径缓存或分析。
+- `.osu` 可直接交给当前前端 parser。非 mania 模式允许生成卡片，但 mania 专属 RC/LN 和 Sunny 估算并不因此变成适用于所有模式的算法。
+- 聊天插件的 `.mc` 转换使用 `meta.mode`、`meta.mode_ext.column` 和 `note[]` 转成临时 `.osu`，接受 Key 1–18K；非 Key 和旧版数组式音符格式仍拒绝。独立 Overlay 自带 C# 转换器，可将 Malody Key/Catch/Taiko 及其他模式映射为卡片输入。所有非 4K mania 的 RC/LN 固定密度值保持 `-`，不把 4K 算法套到其他键数。
+- 5K 曾有两个独立阻断点：`.mc` 转换器硬编码只接受 4K；即使 `.osu` 5K 成功分析，离屏渲染器又把左上数值 `-` 误判为分析未完成。现已放宽转换到 1–18K，并以页面 `status.ok` 判定渲染完成；`-` 是非 4K 的预期 RC/LN 显示，不再阻止卡片生成。
+- 若某种格式含多难度，解析器必须先根据 `IndexInFile` 选中对应难度，再生成输入文本。不能将同一文件中的所有难度音符混成一张卡片。
+- 未验证 BMS、TJA、SM、Quaver 等格式能否无损转成当前 renderer 所需的 `.osu` 结构；不得仅凭 `FilePath` 扩展名推断它们可以使用 mania 算法。
+
+## 本机运行时检查
+
+检查目标目录为 `E:\Program Files (x86)\Steam\steamapps\common\MalodyV`。本机文件元数据与配置显示：BepInEx `6.0.0-be.785`、Doorstop `4.5.0`、Unity `2022.3.62f2c1`；目标是 64 位 IL2CPP。Doorstop 加载 `BepInEx\core\BepInEx.Unity.IL2CPP.dll`，配置中的 CoreCLR 路径是 `dotnet\coreclr.dll`，核心库目录是 `dotnet`，并包含 `BepInEx\interop\Assembly-CSharp.dll`。这表明该环境是 IL2CPP 插件环境，不能按 Mono BepInEx 的引用方式构建。
+
+独立插件已对照目标安装目录中的 BepInEx core、interop 和 Unity interop 程序集构建。运行时重装器将 `BepInEx\plugins` 作为保留目录，尤其不能删除其中已有的主题插件；当前安装目录已存在 `MalodyVThemeLoader` 插件。
+
+## 独立安装器与 Overlay
+
+- 安装器工程：`malodyv_tools/installer`；单文件发布：`malodyv_tools/release/MalodyV.BepInExInstaller.exe`（自包含、压缩）。
+- 安装器从 BepInEx 官方 bleeding-edge 页面动态选择最新 Windows x64 IL2CPP 归档，并先检测 WebView2 Runtime；缺失时通过 Microsoft HTTPS 引导程序安装并验证运行时注册项。BepInEx 归档下载到游戏目录下的临时目录，校验 ZIP 路径并确认核心 DLL 存在，再替换运行时；失败时恢复旧运行时。替换前拒绝游戏仍在运行、目标目录是 reparse point 的情况。
+- 覆盖 `BepInEx` 时会把旧 `BepInEx/plugins` 原目录移动到新运行时，其他运行时文件按归档重建。当前机器现有的 `MalodyVThemeLoader` 因此会保留。安装器成品已构建，但没有运行它覆盖当前 `6.0.0-be.785` 安装。
+- Overlay 发布目录：`malodyv_tools/release/MalodyVReworkOverlayFramework`；已部署至 `E:\Program Files (x86)\Steam\steamapps\common\MalodyV\BepInEx\plugins\MalodyVReworkOverlay`，插件 DLL 与伴侣程序位于同一目录。
+- 游戏内插件以 .NET 6 编译，运行于 BepInEx IL2CPP；独立 WPF/WebView2 伴侣使用 framework-dependent .NET 8，提供管理窗口和透明置顶卡片。本机已安装 .NET 8 Desktop Runtime 和 WebView2 Runtime。卡片 HTML/CSS/JS、字体、WASM、ONNX 与参考算法源码一起打包，页面由本地 HTTP 服务供 WebView2 加载。
+- Overlay 关闭 WebSocket、联网更新和遥测；本地服务提供谱面文本、设置、背景图、参考难度与分析选项端点。页面复用当前卡片实现，不另画一套 UI。
+- `ItemChart.OnPointerClick` 覆盖鼠标选择，`ItemChart.SetSelected` 覆盖列表键盘选择，`SceneChart.OnClose` 清除卡片。IPC 使用本地命名管道 `MalodyV.ReworkOverlay.Selection`。游戏侧只在 `FilePath + IndexInFile + DisplayVersion` 变化时发送更新，伴侣在新选择到达时重载分析。
+- `.mcz` 本质上是包含多张谱面及多个模式的 ZIP。同一容器路径可能对应不同难度；不能按 ZIP 首项或仅按路径选图。Overlay 先用游戏提供的 `DisplayVersion` 对照内部 `.mc`/`.osu` 的难度名，`IndexInFile` 作为版本信息缺失时的回退索引。
+- Overlay 转换 `.mc` 为页面所需的 `.osu` 输入；Key 模式保持 mania，Catch/Taiko 使用相应 osu! mode，其余 Malody 模式降级为可渲染的通用卡片输入。`.osu`、`.mc` 以及包含这些文件的 `.mcz`/`.zip`/`.osz` 已实现；独立 `.tja`、BMS 等尚未无损转换。
+- SunnyRework/OsuSR 由随包的同目录 toolkit 算法计算。参考结果需要系统 Python（PATH 中的 `python`）和 NumPy；管理窗口可配置解释器与 toolkit 路径。没有 Python 或计算失败时标签显示 `-`。本机 Python 3.12 与 NumPy 2.4.4 已完成计算冒烟测试。
+- WebView2 Evergreen Runtime 是伴侣窗口依赖。安装器会自动补装缺失运行时；若用户跳过本安装器单独部署插件，则需要自行安装 WebView2 Runtime。
+
+## Bot 插件目录与自动同步
+
+- BepInEx 发布目录完整保留 `nonebot_plugin_rework/`，包括 Python 插件源码和 `tosu_plugin/` 前端。卡片 HTTP 服务只从 `nonebot_plugin_rework/tosu_plugin` 读取，不回退到旧的 `Card` 副本，避免游戏卡片和 Bot 卡片各自漂移。
+- `malodyv_tools/overlay/Build-Release.ps1` 在 Bot 仓库工作树中执行时，会先调用 `scripts/Sync-BotPlugin.ps1`，将当前 `nonebot_plugin_rework/` 镜像到 BepInEx 子仓库；独立克隆没有上级 Bot 目录时，则使用子仓库内随版本控制提交的副本。镜像只排除运行时生成的 `__pycache__` 和 `.pyc`。
+- Bot 仓库根目录的 `bepinex-bot-manifest.json` 由 `scripts/Update-BepInExBotManifest.ps1` 生成。目录哈希使用相对路径（UTF-8、斜杠分隔）与文件字节组成，按 Ordinal 路径排序，忽略 `__pycache__` 与 `.pyc`；发布脚本、同步器必须使用相同算法。
+- 管理程序启动后先比较本地 Bot 目录哈希与 manifest。哈希不同时，只从固定的 `MCPsDE/nonebot-plugin-for-osumania4k` GitHub HTTPS 归档下载；会检查重定向主机、压缩与展开大小、条目数量、路径穿越和符号链接，再验证提取目录哈希。校验通过后在同一目录卷暂存并替换，失败保留旧目录；同步只操作 `nonebot_plugin_rework/`，不触碰 BepInEx 的其他插件。
+- BepInEx 游戏插件自身计算其程序集 SHA-256，并读取独立仓库 `manifest.json` 对照版本与哈希；不一致时通过本地管道通知管理窗口显示可关闭提示。伴侣程序另行检查自身 EXE 哈希。提示不阻止游戏或卡片继续使用。
+- HTTPS 与 SHA-256 可发现传输损坏及归档/manifest 不一致，但 manifest 和归档来自同一 GitHub 账号，并非数字签名。如果仓库或账号被接管，攻击者可以同时替换内容与哈希；因此自动同步应限定信任固定个人仓库，并审阅提交。远程卡片 JavaScript 会在 WebView 中执行，这是卡片渲染本身所需的信任边界。
+- 发布前运行 `scripts/Update-BepInExBotManifest.ps1` 更新 Bot 仓库 manifest；然后从 Bot 仓库构建 `malodyv_tools/overlay/Build-Release.ps1`，提交 overlay 仓库内随包的原始插件目录、插件 DLL 哈希 manifest 和宿主代码。不要用 `git pull` 替换运行目录，也不要删除 `BepInEx/plugins`。
+
+## 验证边界
+
+- 安装器、伴侣窗口和 IL2CPP 插件源码均已本机编译；安装器 EXE、framework-dependent 伴侣程序与插件 DLL 随发布生成。
+- 插件包已直接部署到当前 MalodyV 的 `BepInEx/plugins/MalodyVReworkOverlay`；部署前后核对 `MalodyVThemeLoader` 文件 SHA-256，未改变现有主题插件。当前 BepInEx `6.0.0-be.785` 未被安装器覆盖。
+- 安装器、伴侣程序、插件均已构建；Python 6 项单元测试、Node 8 项管线测试通过，聊天插件的合成 5K Malody 谱完成 PNG 渲染。尚未启动伴侣执行 IPC 冒烟，也未启动 MalodyV 验证 Harmony hook、透明窗口层级和游戏内切图；启动后检查 `BepInEx/LogOutput.log` 的 `MalodyV Rework Overlay` 加载记录。若 interop 方法与 `.785` 不匹配，先核实日志，不要删除其他插件。
+
+## 维护约束
+
+- `Emiria` 仅作只读参考。
+- overlay 在谱面身份或 `PlayInfo.Local` 的分析相关 mod 状态变化时重算。
+- 管理窗口与游戏顶层卡片窗口由 companion 程序提供；继续复用现有 HTML/CSS/JS 页面。
+- 若需支持 `.tja`、BMS 等额外格式，必须先按 `IndexInFile` 解析对应难度并转换，不能把不同模式的 notes 合并。

@@ -20,9 +20,9 @@
     }
 
     .main-card.bars-pattern {
-        height: 555px;
+        height: auto;
         min-height: 555px;
-        max-height: 555px;
+        max-height: none;
     }
 
     .main-card.bars-graph {

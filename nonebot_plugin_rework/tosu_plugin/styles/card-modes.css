@@ -65,13 +65,19 @@
 }
 
 .main-card.bars-pattern {
-    height: 575px;
+    grid-template-rows: none;
+    grid-auto-rows: auto;
+    align-content: start;
+    gap: 10px;
+    height: auto;
     min-height: 575px;
-    max-height: 575px;
+    max-height: none;
+    overflow: visible;
 }
 
 .main-card.bars-pattern .cluster-bars {
-    overflow-y: hidden;
+    overflow-y: visible;
+    max-height: none;
 }
 
 .main-card.bars-graph {

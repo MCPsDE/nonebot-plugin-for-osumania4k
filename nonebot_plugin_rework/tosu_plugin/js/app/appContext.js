@@ -51,6 +51,14 @@ export const bodyGraphCursorEl = document.getElementById("body-graph-cursor");
 export const bodyGraphCursorDotEl = document.getElementById("body-graph-cursor-dot");
 export const bodyGraphPauseMarkersEl = document.getElementById("body-graph-pause-markers");
 export const bodyGraphErrorEl = document.getElementById("body-graph-error");
+export const profileGraphWrapEl = document.getElementById("profile-graph-wrap");
+export const profileGraphRcFillEl = document.getElementById("profile-graph-rc-fill");
+export const profileGraphRcUpperEl = document.getElementById("profile-graph-rc-upper");
+export const profileGraphRcLowerEl = document.getElementById("profile-graph-rc-lower");
+export const profileGraphRcLineEl = document.getElementById("profile-graph-rc-line");
+export const profileGraphLnLineEl = document.getElementById("profile-graph-ln-line");
+export const profileGraphDurationEl = document.getElementById("profile-graph-duration");
+export const profileGraphMaxEl = document.getElementById("profile-graph-max");
 export const estDiffCaptionEl = document.getElementById("est-diff-caption");
 export const patternClustersEl = document.getElementById("pattern-clusters");
 export const ettSkillBarsEl = document.getElementById("ett-skill-bars");
@@ -80,6 +88,8 @@ export const state = {
     odFlag: null,
     cvtFlag: null,
     modSignature: "",
+    gameModMask: 0,
+    gameModSignature: "none",
     ppMetrics: null,
     modCodes: [],
     classicMod: false,
@@ -126,6 +136,7 @@ export const state = {
     enableTelemetry: APP_CONFIG.defaults.enableTelemetry,
     numericDifficulty: null,
     numericDifficultyHint: null,
+    referenceDifficultyCaption: "SunnyRework:-|OsuSR:-",
     lnStar: 0,
     forceHideNumericDifficulty: false,
     showModeTagCapsule: APP_CONFIG.defaults.showModeTagCapsule,

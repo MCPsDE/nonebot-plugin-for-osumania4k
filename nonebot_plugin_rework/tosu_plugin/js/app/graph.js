@@ -694,7 +694,10 @@ export function updateDiffTextVisibility() {
     }
 
     estDiffCaptionEl.hidden = mode === "None";
-    if (mode === "Graph") {
+    const referenceCaption = String(state.referenceDifficultyCaption || "").trim();
+    if (referenceCaption) {
+        estDiffCaptionEl.textContent = referenceCaption;
+    } else if (mode === "Graph") {
         estDiffCaptionEl.textContent = "Difficulty Graph";
     } else if (showRightCapsule) {
         switch (mode) {

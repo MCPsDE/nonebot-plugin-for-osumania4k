@@ -26,7 +26,7 @@ from .osu_source import OsuSourceError, decode_osu_text
 logger = logging.getLogger(__name__)
 
 MALODY_MODE_KEY = 0
-SUPPORTED_KEYS = 4
+MAX_SUPPORTED_KEYS = 18
 
 
 def parse_beat(value: Any) -> float | None:
@@ -182,8 +182,8 @@ def convert_mc(
     if key <= 0:
         chart.error = "该 Malody 谱面缺少键数信息，无法判断轨道数。"
         return chart
-    if key != SUPPORTED_KEYS:
-        chart.error = f"该谱面为 {key}K，本工具仅支持 4K mania 谱面。"
+    if key > MAX_SUPPORTED_KEYS:
+        chart.error = f"该谱面为 {key}K，当前最多支持 {MAX_SUPPORTED_KEYS}K 谱面。"
         return chart
     chart.key = key
 

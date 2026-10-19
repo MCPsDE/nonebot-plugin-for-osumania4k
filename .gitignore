@@ -13,3 +13,5 @@ logs/
 .pytest_cache/
 .DS_Store
 Thumbs.db
+output/
+malodyv_tools/

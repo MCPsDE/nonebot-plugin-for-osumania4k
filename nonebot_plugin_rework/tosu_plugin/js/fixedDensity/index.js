@@ -91,6 +91,11 @@ const LN_LEN_WEIGHT_GAIN = 1.0; // ln_len_weight_gain：长度权重增益
 const LN_HOLD_REF_MS = 40.0; // ln_hold_ref_ms：长度因子 ℓ/(ℓ+ℓ₀) 的参考时长
 const LN_A = 5.44200375179058;
 const LN_B = 0.0960408821250538;
+const PROFILE_SAMPLE_INTERVAL_MS = 100.0;
+const RC_PROFILE_ROBUST_WINDOW_MS = 360.0;
+const RC_PROFILE_SMOOTH_WINDOW_MS = 180.0;
+const RC_PROFILE_LOW_QUANTILE = 0.2;
+const RC_PROFILE_HIGH_QUANTILE = 0.8;
 
 // LN 头/尾判定窗与长度有效性门（OD 相关）
 const LN_HEAD_WINDOW_A = 64.0; // 头判窗总宽 = A − B·OD（ms）
@@ -877,14 +882,214 @@ function normalizeRate(rate) {
     return value;
 }
 
+function buildProfileTimes(mergedSeq, lanes) {
+    const endpoints = [];
+    for (const lane of lanes) {
+        for (const note of lane) {
+            endpoints.push(note.t);
+            if (note.len > 0) {
+                endpoints.push(note.t + note.len);
+            }
+        }
+    }
+    if (endpoints.length < 2) {
+        return [];
+    }
+
+    endpoints.sort((a, b) => a - b);
+    const start = endpoints[0];
+    const end = endpoints[endpoints.length - 1];
+    const times = [];
+    for (let time = start; time < end; time += PROFILE_SAMPLE_INTERVAL_MS) {
+        times.push(time);
+    }
+    times.push(end);
+    for (const row of mergedSeq) {
+        times.push(row[0]);
+    }
+    return uniqueSorted(times.sort((a, b) => a - b));
+}
+
+function buildLnProfile(lanes, od, rate, times, n) {
+    const invRate = 1.0 / rate;
+    const releaseEvents = new Map();
+    const holdChanges = new Map();
+    for (const lane of lanes) {
+        const holds = lane.filter((note) => note.len > 0);
+        const eventScores = lnEventScores(lane, od);
+        if (!eventScores) {
+            continue;
+        }
+
+        for (let i = 0; i < holds.length; i += 1) {
+            const releaseTime = (holds[i].t + holds[i].len) * invRate;
+            const current = releaseEvents.get(releaseTime) || [0.0, 0.0];
+            current[0] += (eventScores.sRel[i] || 0.0) * rate;
+            current[1] += (eventScores.sJack[i] || 0.0) * rate;
+            releaseEvents.set(releaseTime, current);
+        }
+
+        for (let i = 0; i < holds.length; i += 1) {
+            const score = eventScores.sHold[i] || 0.0;
+            const start = holds[i].t * invRate;
+            const end = (holds[i].t + holds[i].len) * invRate;
+            holdChanges.set(start, (holdChanges.get(start) || 0.0) + score);
+            holdChanges.set(end, (holdChanges.get(end) || 0.0) - score);
+        }
+    }
+
+    const absorb = lnReleaseAbsorb(lanes, LN_ABSORB_GAIN);
+    const valid = lnHoldValidity(lanes, od);
+    const rhoFactor = lnRhoCurve(lnHoldRatio(lanes, od), LN_MULT_EXP, LN_MULT_RHO_C, LN_MULT_RHO_LIN);
+    const values = [];
+    let activeHoldScore = 0.0;
+    for (const time of times) {
+        activeHoldScore += holdChanges.get(time) || 0.0;
+        const release = releaseEvents.get(time) || [0.0, 0.0];
+        const localMultiplier = rhoFactor * (
+            LN_MULT_REL * release[0] * absorb
+            + LN_MULT_JACK * release[1] * absorb
+            + LN_MULT_HOLD * activeHoldScore
+        ) * valid;
+        values.push(localMultiplier > 0.0 && n > 0.0
+            ? LN_A * Math.log1p(LN_B * localMultiplier * n)
+            : 0.0);
+    }
+    return values;
+}
+
+function quantileSorted(values, probability) {
+    if (values.length === 0) {
+        return 0.0;
+    }
+    const position = (values.length - 1) * Math.min(Math.max(probability, 0.0), 1.0);
+    const lo = Math.floor(position);
+    const hi = Math.ceil(position);
+    if (lo === hi) {
+        return values[lo];
+    }
+    return values[lo] + (values[hi] - values[lo]) * (position - lo);
+}
+
+function buildProfileIntegral(times, values) {
+    const integral = new Float64Array(times.length);
+    for (let i = 1; i < times.length; i += 1) {
+        const dt = Math.max(0.0, Number(times[i]) - Number(times[i - 1]));
+        const left = Math.max(0.0, Number(values[i - 1]) || 0.0);
+        const right = Math.max(0.0, Number(values[i]) || 0.0);
+        integral[i] = integral[i - 1] + (left + right) * 0.5 * dt;
+    }
+    return integral;
+}
+
+function profileIntegralAt(times, values, integral, target) {
+    if (times.length === 0) {
+        return 0.0;
+    }
+    if (target <= times[0]) {
+        return 0.0;
+    }
+    const last = times.length - 1;
+    if (target >= times[last]) {
+        return integral[last];
+    }
+
+    const right = upperBound(times, target);
+    const left = Math.max(0, right - 1);
+    const span = Math.max(0.0, Number(times[right]) - Number(times[left]));
+    if (span <= 0.0) {
+        return integral[left];
+    }
+
+    const fraction = (target - Number(times[left])) / span;
+    const leftValue = Math.max(0.0, Number(values[left]) || 0.0);
+    const rightValue = Math.max(0.0, Number(values[right]) || 0.0);
+    const targetValue = leftValue + (rightValue - leftValue) * fraction;
+    return integral[left] + (leftValue + targetValue) * 0.5 * (target - Number(times[left]));
+}
+
+function smoothProfileSeries(times, values, windowMs) {
+    const output = new Array(values.length);
+    const halfWindow = Math.max(0.0, windowMs) * 0.5;
+    const integral = buildProfileIntegral(times, values);
+    for (let i = 0; i < values.length; i += 1) {
+        const center = Number(times[i]);
+        const start = Math.max(Number(times[0]), center - halfWindow);
+        const end = Math.min(Number(times[times.length - 1]), center + halfWindow);
+        const span = end - start;
+        if (span > 0.0) {
+            const area = profileIntegralAt(times, values, integral, end)
+                - profileIntegralAt(times, values, integral, start);
+            output[i] = Math.max(0.0, area / span);
+        } else {
+            output[i] = Math.max(0.0, Number(values[i]) || 0.0);
+        }
+    }
+    return output;
+}
+
+function buildRcEnvelope(times, rawValues) {
+    const lower = new Array(rawValues.length);
+    const upper = new Array(rawValues.length);
+    const halfWindow = RC_PROFILE_ROBUST_WINDOW_MS * 0.5;
+
+    for (let i = 0; i < rawValues.length; i += 1) {
+        const start = lowerBound(times, times[i] - halfWindow);
+        const end = upperBound(times, times[i] + halfWindow);
+        const window = [];
+        for (let j = start; j < end; j += 1) {
+            const value = Number(rawValues[j]);
+            if (Number.isFinite(value)) {
+                window.push(Math.max(0.0, value));
+            }
+        }
+        window.sort((a, b) => a - b);
+        lower[i] = quantileSorted(window, RC_PROFILE_LOW_QUANTILE);
+        upper[i] = quantileSorted(window, RC_PROFILE_HIGH_QUANTILE);
+    }
+
+    const smoothLower = smoothProfileSeries(times, lower, RC_PROFILE_SMOOTH_WINDOW_MS);
+    const smoothUpper = smoothProfileSeries(times, upper, RC_PROFILE_SMOOTH_WINDOW_MS);
+    const center = smoothLower.map((value, index) =>
+        (value + Math.max(value, smoothUpper[index])) * 0.5);
+    return {
+        center,
+        lower: smoothLower,
+        upper: smoothUpper.map((value, index) => Math.max(value, smoothLower[index])),
+    };
+}
+
+function buildFixedDensityProfile(mergedSeq, displayLanes, lnLanes, od, rate, n, chord, lnN) {
+    const times = buildProfileTimes(mergedSeq, displayLanes);
+    if (times.length < 2) {
+        return null;
+    }
+
+    const rawRcValues = sampleDecay(mergedSeq, times);
+    const rawRcProfile = Array.from(rawRcValues, (value) => value > 0.0
+        ? Math.max(0.0, mapInvert(Math.log(value) - FIT_E_CHORD * chord - FIT_D_LNN * lnN))
+        : 0.0);
+    const rcEnvelope = buildRcEnvelope(times, rawRcProfile);
+    const lnValues = buildLnProfile(lnLanes, od, rate, times, n);
+    return {
+        times,
+        rcValues: rcEnvelope.center,
+        rcCenterValues: rcEnvelope.center,
+        rcLowerValues: rcEnvelope.lower,
+        rcUpperValues: rcEnvelope.upper,
+        lnValues,
+        maxValue: Math.max(0.0, ...rcEnvelope.upper, ...lnValues),
+    };
+}
+
 /**
  * 计算 Fixed Density v1 的 rc_value 与 ln_value。
  *
  * @param {string|object} source .osu 文本 或 已 process() 的 OsuFileParser 实例
  * @param {number} [rate=1] 变速倍率（DT=1.5、HT=0.75、lazer 任意正速）；时间戳按 1/rate 缩放
- * @returns {{ rcValue: number, lnValue: number }} 无有效物件时两者均为 NaN
+ * @returns {{ rcValue: number, lnValue: number, profile: object|null }}
  */
-export function calculateFixedDensity(source, rate = 1.0) {
+function calculateFixedDensityInternal(source, rate = 1.0, includeProfile = false) {
     const parsed = resolveParsed(source);
     if (parsed?.status === "NotMania") {
         throw new Error("Beatmap mode is not mania");
@@ -1049,7 +1254,22 @@ export function calculateFixedDensity(source, rate = 1.0) {
     const k = lnMultiplier(rawLanes, od, rateNorm);
     const lnValue = LN_A * Math.log1p(LN_B * k * n);
 
-    return { rcValue, lnValue };
+    return {
+        rcValue,
+        lnValue,
+        profile: includeProfile
+            ? buildFixedDensityProfile(mergedSeq, lanes, rawLanes, od, rateNorm, n, chord, lnN)
+            : null,
+    };
+}
+
+export function calculateFixedDensityProfile(source, rate = 1.0) {
+    return calculateFixedDensityInternal(source, rate, true);
+}
+
+export function calculateFixedDensity(source, rate = 1.0) {
+    const result = calculateFixedDensityInternal(source, rate, false);
+    return { rcValue: result.rcValue, lnValue: result.lnValue };
 }
 
 export default calculateFixedDensity;

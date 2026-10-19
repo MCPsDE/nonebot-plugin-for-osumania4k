@@ -76,6 +76,14 @@ import {
     setGraphLoading,
     updateDiffTextVisibility,
 } from "./graph.js";
+import { clearProfileGraph, renderProfileGraph } from "./profileGraph.js";
+import {
+    calculateLocalReferenceMetrics,
+    fetchReferenceMetrics,
+    hasReferenceMetrics,
+    setReferenceDifficultyCaption,
+} from "./referenceMetrics.js";
+import { isFourKeyMania, resolveDifficultyText } from "./cardMode.js";
 import {
     currentEstimatorAlgorithm,
     isAutoDisplayEnabledNow,
@@ -339,6 +347,7 @@ export async function fetchBeatmapFile(reason) {
     } else {
         clearDiffGraph();
     }
+    clearProfileGraph();
 
     // 结果缓存：fetch 之前查缓存，覆盖检查（computed 需求）不匹配视为 miss。
     // graph 覆盖与估算器的 withGraph 条件一致（diffText=Graph 或主体显示 Graph）。
@@ -358,6 +367,7 @@ export async function fetchBeatmapFile(reason) {
             || state.vibroDetection
             || (currentEstimatorAlgorithm() === "Companella" || currentEstimatorAlgorithm() === "Mixed"),
         graph: state.diffText === "Graph" || contentBarShows("Graph"),
+        profileGraph: true,
         interlude: state.srText === "InterludeSR"
             || state.diffText === "InterludeSR"
             || currentEstimatorAlgorithm() === "Companella"
@@ -365,9 +375,8 @@ export async function fetchBeatmapFile(reason) {
         fixedDensity: state.srText === "Fixed Density v1",
         pp: contentBarShows("ReworkPP") || state.srText === "ReworkPP",
     };
-    // 缓存键加版本段：star 口径统一为 Sunny 原始 sr 后，旧快照（存的是 Azusa/Roxy 映射 star）必须失效。
-    // star-v3：新增 Fixed Density v1 value 与覆盖标记，旧快照缺少该字段须失效重算。
-    const CACHE_KEY_STAR_UNIFIED_VERSION = "star-v3";
+    // 缓存键加版本段：曲线与右上角参考星数均为新增数据，旧快照必须失效。
+    const CACHE_KEY_STAR_UNIFIED_VERSION = "profile-caption-v3-multimode";
     const cacheKey = `${CACHE_KEY_STAR_UNIFIED_VERSION}|${state.estimatorAlgorithm}|${state.lastBeatmapIdentity}|${state.modSignature}`;
     const isMetaDegraded = String(state.lastBeatmapIdentity || "").startsWith("meta:");
     let cached = null;
@@ -375,6 +384,7 @@ export async function fetchBeatmapFile(reason) {
         const snapshot = resultCache.get(cacheKey);
         if (snapshot
             && snapshot.computed.graph === needComputed.graph
+            && snapshot.computed.profileGraph === needComputed.profileGraph
             && snapshot.computed.pattern === needComputed.pattern
             && snapshot.computed.ett === needComputed.ett
             && snapshot.computed.interlude === needComputed.interlude
@@ -383,6 +393,8 @@ export async function fetchBeatmapFile(reason) {
             cached = snapshot;
         }
     }
+    let referenceMetrics = cached?.referenceMetrics || null;
+    let profileGraph = cached?.profileGraph || null;
 
     try {
         let parsedInfo = null;
@@ -424,6 +436,10 @@ export async function fetchBeatmapFile(reason) {
             // parse-once：解析在 pipeline 内完成一次，parsedSummary 回传后（下方）才做 override。
         }
 
+        if (!referenceMetrics) {
+            referenceMetrics = await fetchReferenceMetrics();
+        }
+
         // 估算分派 + 附属段（pattern/ett/interlude/Companella 二次 Ett）收敛为一次 pipeline
         // 调用（worker 单次往返或主线程同步回退）。pipeline 内部解析一次并共享给估算器/归一化/
         // SunnyWindow/Interlude（pattern 保留独立 patternOsuParser 解析、ett 保留自身解析），
@@ -439,8 +455,7 @@ export async function fetchBeatmapFile(reason) {
                     speedRate: state.speedRate,
                     odFlag: state.odFlag,
                     cvtFlag: state.cvtFlag,
-                    // graph 需要与否用 fetch 前的保守值（needComputed.graph = diffText=Graph 或主体
-                    // 显示 Graph）。override 只会把主体降级为 Pattern（不会引入 Graph），保守值 ⊇ 实际 showsGraph。
+                    // The body graph is independent from the Fixed Density profile graph.
                     withGraph: needComputed.graph,
                     extendedEstimationRange: state.extendedEstimationRange,
                     enableAlwaysShowLNDifficulty: state.enableAlwaysShowLNDifficulty,
@@ -450,6 +465,7 @@ export async function fetchBeatmapFile(reason) {
                     forceSunnyReferenceHo: state.azusaSunnyReferenceHo,
                     forceSunnyWindow: state.forceSunnyWindow,
                     enableAnalyzeLN: state.enableAnalyzeLN,
+                    withProfileGraph: needComputed.profileGraph,
                     display6kLevel: state.display6kLevel,
                     // 附属段开关（needComputed 保守值，与缓存覆盖检查同源）：
                     withPattern: needComputed.pattern,
@@ -466,6 +482,13 @@ export async function fetchBeatmapFile(reason) {
                 pipelineResult = wp ? await wp : await runAnalysisPipeline(pipelineInput);
                 parsedInfo = pipelineResult.parsedSummary;
                 applyContentBarOverride(parsedInfo.columnCount);
+                if (!hasReferenceMetrics(referenceMetrics)) {
+                    referenceMetrics = calculateLocalReferenceMetrics(
+                        rawText,
+                        pipelineResult,
+                        state.speedRate,
+                    );
+                }
             } catch (error) {
                 if (isStaleRequest()) return;
                 resetReworkDisplay();
@@ -483,11 +506,19 @@ export async function fetchBeatmapFile(reason) {
                         metadata: fallbackParsed.metaData || {},
                         lnRatio: Number(fallbackParsed.lnRatio) || 0,
                         columnCount: Number(fallbackParsed.columnCount) || 0,
+                        gameMode: String(fallbackParsed.gameMode ?? "0"),
+                        objectCount: Array.isArray(fallbackParsed.noteStarts) ? fallbackParsed.noteStarts.length : 0,
                     };
                     applyContentBarOverride(parsedInfo.columnCount);
                 } catch (_) {
                     // 元信息解析也失败：降级为空元信息（避免下游渲染读 null；columnCount 0 → 无 override）。
-                    parsedInfo = { metadata: {}, lnRatio: 0, columnCount: 0 };
+                    parsedInfo = {
+                        metadata: {},
+                        lnRatio: 0,
+                        columnCount: 0,
+                        gameMode: "0",
+                        objectCount: 0,
+                    };
                 }
             }
         }
@@ -544,25 +575,26 @@ export async function fetchBeatmapFile(reason) {
         const estimatorNeedsCompanellaData = estimatorAlgorithm === "Companella"
             || estimatorAlgorithm === "Mixed";
 
+        const isManiaMode = String(parsedInfo.gameMode ?? "0") === "3";
         const needVibroDetection = state.vibroDetection;
-        const needPatternAnalysis = showsPattern
+        const needPatternAnalysis = isManiaMode && (showsPattern
             || state.srText === "Pattern"
             || state.diffText === "Pattern"
             || state.useSvDetection
             || needVibroDetection
-            || autoDisplayEnabled;
-        const needMsdValue = state.srText === "MSD" || state.diffText === "MSD";
-        const needInterludeValue = state.srText === "InterludeSR"
+            || autoDisplayEnabled);
+        const needMsdValue = isManiaMode && (state.srText === "MSD" || state.diffText === "MSD");
+        const needInterludeValue = isManiaMode && (state.srText === "InterludeSR"
             || state.diffText === "InterludeSR"
-            || estimatorNeedsCompanellaData;
-        const needFixedDensityValue = state.srText === "Fixed Density v1";
-        const needEtternaAnalysis = showsEtterna
+            || estimatorNeedsCompanellaData);
+        const needFixedDensityValue = isFourKeyMania(parsedInfo) && state.srText === "Fixed Density v1";
+        const needEtternaAnalysis = isManiaMode && (showsEtterna
             || needMsdValue
             || needVibroDetection
-            || estimatorNeedsCompanellaData;
-        const shouldReportEtternaError = showsEtterna
+            || estimatorNeedsCompanellaData);
+        const shouldReportEtternaError = isManiaMode && (showsEtterna
             || needMsdValue
-            || estimatorNeedsCompanellaData;
+            || estimatorNeedsCompanellaData);
         const shouldForceSunnyWindow = state.forceSunnyWindow;
         let lnStar = null;
         if (cached) {
@@ -584,8 +616,10 @@ export async function fetchBeatmapFile(reason) {
             lnStar = cached.rework.lnStar;
             state.lnStar = cached.rework.lnStar;
             typePercentageData = cached.rework.typePercentageData;
+            profileGraph = cached.profileGraph || null;
         } else if (pipelineResult) {
             rework = pipelineResult.rework;
+            profileGraph = pipelineResult.profileGraph || null;
             state.actualEstimatorAlgorithm = pipelineResult.actualEstimatorAlgorithm;
             state.ppMetrics = pipelineResult.ppMetrics || null;
             vibroEligible = pipelineResult.vibro.eligible;
@@ -651,9 +685,18 @@ export async function fetchBeatmapFile(reason) {
             }
 
             const lnPercent = `${(rework.lnRatio * 100).toFixed(1)}%`;
-            resolvedMetaHtml = `LN%: ${lnPercent}<br/>Keys: ${rework.columnCount}`;
+            const modeLabels = { "0": "osu!standard", "1": "osu!taiko", "2": "osu!catch", "3": "osu!mania" };
+            resolvedMetaHtml = String(parsedInfo.gameMode ?? "0") === "3"
+                ? `LN%: ${lnPercent}<br/>Keys: ${rework.columnCount}`
+                : `Mode: ${modeLabels[String(parsedInfo.gameMode ?? "0")] || `Mode ${parsedInfo.gameMode}`}<br/>Objects: ${parsedInfo.objectCount ?? "-"}`;
             reworkMetaEl.innerHTML = resolvedMetaHtml;
             reworkMetaEl.classList.remove("loading");
+        }
+
+        if (showsPattern) {
+            renderProfileGraph(profileGraph);
+        } else {
+            clearProfileGraph();
         }
 
         if (needInterludeValue) {
@@ -927,6 +970,8 @@ export async function fetchBeatmapFile(reason) {
                     interludeStar,
                     fixedDensityValue,
                     fixedDensityLnValue,
+                    profileGraph,
+                    referenceMetrics,
                     isVibroMap,
                     sixKConst,
                     ppMetrics: pipelineResult.ppMetrics || null,
@@ -935,31 +980,39 @@ export async function fetchBeatmapFile(reason) {
                         metadata: parsedInfo.metadata,
                         lnRatio: parsedInfo.lnRatio,
                         columnCount: parsedInfo.columnCount,
+                        gameMode: parsedInfo.gameMode,
+                        objectCount: parsedInfo.objectCount,
                     },
                     computed: needComputed,
                 }, { skip: isMetaDegraded });
             }
 
-            const fixedDensityDifficultyText = state.srText === "Fixed Density v1"
+            const supportsFixedDensity = isFourKeyMania({
+                ...parsedInfo,
+                columnCount: parsedInfo.columnCount ?? rework?.columnCount,
+            });
+            const fixedDensityDifficultyText = state.srText === "Fixed Density v1" && supportsFixedDensity
                 ? [
                     fixedDensityRcLabel(fixedDensityValue),
                     fixedDensityLnLabel(fixedDensityLnValue),
                 ].filter(Boolean).join("\n")
                 : "";
+            const difficultyText = resolveDifficultyText({
+                supportsFixedDensity,
+                srText: state.srText,
+                fixedDensityDifficultyText,
+                resolvedNumericDifficulty,
+                resolvedEstDiff,
+                sunnyEstDiff: referenceMetrics?.sunnyEstDiff,
+            });
+            setEstimateDifficultyText(formatDiffForDisplay(difficultyText));
+        }
 
-            if (fixedDensityDifficultyText) {
-                setEstimateDifficultyText(fixedDensityDifficultyText);
-            } else if (Number.isFinite(resolvedNumericDifficulty) && resolvedNumericDifficulty >= 18.5) {
-                if (resolvedEstDiff) {
-                    const strList = resolvedEstDiff.split("||");
-                    strList[0] = "> Cloverwisp Theta high";
-                    setEstimateDifficultyText(formatDiffForDisplay(strList.join("||")));
-                }
-                else {
-                    setEstimateDifficultyText("> Cloverwisp Theta high");
-                }
-            }
-            else setEstimateDifficultyText(formatDiffForDisplay(resolvedEstDiff));
+        if (!rework) {
+            const supportsFixedDensity = isFourKeyMania(parsedInfo);
+            setEstimateDifficultyText(supportsFixedDensity
+                ? "-"
+                : formatDiffForDisplay(referenceMetrics?.sunnyEstDiff));
         }
 
         const fallbackModeTag = modeTagFromLnRatio(Number(rework?.lnRatio ?? parsedInfo.lnRatio));
@@ -1001,12 +1054,12 @@ export async function fetchBeatmapFile(reason) {
             const beforeSrText = state.srText;
             const profileChanged = refreshAutoDisplayProfile(resolvedModeTag);
 
-            const missingEtterna = (
+            const missingEtterna = isManiaMode && (
                 showsEtterna
                 || state.srText === "MSD"
                 || state.diffText === "MSD"
             ) && !needEtternaAnalysis;
-            const missingPattern = (
+            const missingPattern = isManiaMode && (
                 showsPattern
                 || state.srText === "Pattern"
                 || state.diffText === "Pattern"
@@ -1059,15 +1112,24 @@ export async function fetchBeatmapFile(reason) {
                 leftCapsuleUnit = "SR";
             }
         } else if (state.srText === "Fixed Density v1") {
-            if (Number.isFinite(fixedDensityValue)) {
+            const supportsFixedDensity = isFourKeyMania({
+                ...parsedInfo,
+                columnCount: parsedInfo.columnCount ?? rework?.columnCount,
+            });
+            if (supportsFixedDensity && Number.isFinite(fixedDensityValue)) {
                 showFixedDensityValue(fixedDensityValue);
+                leftCapsuleUnit = "RC";
+            } else if (!supportsFixedDensity) {
+                showFixedDensityValue(Number.NaN);
                 leftCapsuleUnit = "RC";
             } else if (rework) {
                 showNumericStarValue(rework.star);
                 leftCapsuleUnit = "SR";
             }
-            if (Number.isFinite(fixedDensityLnValue)) {
+            if (supportsFixedDensity && Number.isFinite(fixedDensityLnValue)) {
                 showFixedDensityLnValue(fixedDensityLnValue);
+            } else if (!supportsFixedDensity) {
+                showFixedDensityLnValue(Number.NaN);
             }
         } else if (state.srText === "ReworkPP") {
             let ppVal = getLatestPpValue();   // from livePp.js (max PP when idle, live PP in play)
@@ -1115,6 +1177,7 @@ export async function fetchBeatmapFile(reason) {
         if (isVibroMap && state.diffText === "Difficulty") {
             setEstimateDifficultyText("VIBRO");
         }
+        setReferenceDifficultyCaption(referenceMetrics);
 
         const metadataLine = formatMetadataStatus(parsedInfo.metadata);
         const metadataErrors = errors.filter((entry) => {
@@ -1165,6 +1228,8 @@ export async function fetchBeatmapFile(reason) {
         if (isStaleRequest()) return;
         setStatus(`Failed to load beatmap file: ${error.message}`, "error");
         resetReworkDisplay();
+        clearProfileGraph();
+        setReferenceDifficultyCaption(null);
         patternClustersEl.innerHTML = contentBarShows("Pattern")
             ? "<li class=\"cluster-item empty\">No data</li>"
             : "";

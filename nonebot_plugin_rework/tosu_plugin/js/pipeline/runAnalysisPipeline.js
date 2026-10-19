@@ -24,7 +24,7 @@ import { runMixedEstimatorFromText } from "../estimator/mixedEstimator.js";
 import { analyzePatternFromText } from "../patterns/service.js";
 import { analyzeEtternaFromText, DEFAULT_SCORE_GOAL as ETT_DEFAULT_SCORE_GOAL } from "../ett/index.js";
 import { calculateInterludeStar } from "../interlude/index.js";
-import { calculateFixedDensity } from "../fixedDensity/index.js";
+import { calculateFixedDensity, calculateFixedDensityProfile } from "../fixedDensity/index.js";
 
 const NORMALIZATION_ALGORITHMS = new Set(["Azusa", "Roxy", "Mixed"]);
 
@@ -79,15 +79,17 @@ function sanitizePatternResult(result) {
  * @param {object} input.options  显式传入的估算选项（禁止读 state）：speedRate, odFlag, cvtFlag,
  *   withGraph, forceSunnyReferenceHo, forceSunnyWindow, enableAnalyzeLN,
  *   enableAlwaysShowLNDifficulty, display6kLevel, extendedEstimationRange,
- *   withPattern, withEtterna, withInterlude, withFixedDensity, etternaVersion, companellaEtternaVersion
+ *   withPattern, withEtterna, withInterlude, withFixedDensity, withProfileGraph,
+ *   etternaVersion, companellaEtternaVersion
  * @param {object} [input.parsed]  可选：已 process() 的 OsuFileParser 实例（Node/harness 复用解析，
  *   浏览器 worker 不传——worker 内自行解析一次）
  * @returns {Promise<{ rework: object, actualEstimatorAlgorithm: string, sunnyStar: number|null,
- *   sunnyWindow: object|null, sixKConst: number|null,
+ *   sunnyWindow: object|null, profileGraph: object|null, sixKConst: number|null,
  *   ppMetrics: { star: number, variety: number, accScalar: number, totalNotes: number,
  *     spikiness: number, switches: number }|null,  // 仅 options.withPpMetrics === true 时输出
  *   vibro: { star: number, eligible: boolean },
- *   parsedSummary: { metadata: object, lnRatio: number, columnCount: number },
+ *   parsedSummary: { metadata: object, lnRatio: number, columnCount: number,
+ *     gameMode: string, objectCount: number },
  *   patternReport: object|null, patternTopFiveClusters: Array|null, patternError: string|null,
  *   ettResult: object|null, ettError: string|null,
  *   interludeStar: number, interludeError: string|null,
@@ -108,7 +110,45 @@ export async function runAnalysisPipeline({ rawText, estimatorAlgorithm, options
         metadata: parsedData.metaData || {},
         lnRatio: Number(parsedData.lnRatio) || 0,
         columnCount: Number(parsedData.columnCount) || 0,
+        gameMode: String(parsedData.gameMode ?? "0"),
+        objectCount: Array.isArray(parsedData.noteStarts) ? parsedData.noteStarts.length : 0,
     };
+
+    if (parsedSummary.gameMode !== "3") {
+        return {
+            rework: {
+                star: Number.NaN,
+                estDiff: "",
+                numericDifficulty: null,
+                numericDifficultyHint: null,
+                graph: null,
+                lnRatio: parsedSummary.lnRatio,
+                columnCount: parsedSummary.columnCount,
+                typePercentageData: null,
+            },
+            actualEstimatorAlgorithm: "Unsupported mode",
+            sunnyStar: null,
+            sunnyWindow: null,
+            profileGraph: null,
+            sixKConst: null,
+            vibro: { star: Number.NaN, eligible: false },
+            ...(options.withPpMetrics === true ? { ppMetrics: null } : {}),
+            parsedSummary,
+            patternReport: null,
+            patternTopFiveClusters: null,
+            patternError: null,
+            ettResult: null,
+            ettError: null,
+            interludeStar: Number.NaN,
+            interludeError: null,
+            fixedDensityValue: Number.NaN,
+            fixedDensityLnValue: Number.NaN,
+            fixedDensityError: null,
+            companellaEttResult: null,
+            companellaEttError: null,
+            errors: [],
+        };
+    }
 
     // 归一化星数复用决策（决策表见 .omo/evidence/task-11-pipeline.txt）：
     // 仅当算法内部 Sunny 与归一化调用（runSunnyEstimatorFromText(rawText, options)）
@@ -226,14 +266,28 @@ export async function runAnalysisPipeline({ rawText, estimatorAlgorithm, options
         }
     }
 
-    // 5. SunnyWindow（forceSunnyWindow）：calculateSunny + calculateLN（带 parsed + enableAnalyzeLN）。
+    // 5. SunnyWindow is only used by the existing estimator LN override.
     let sunnyWindow = null;
+    let profileGraph = null;
     if (options.forceSunnyWindow) {
-        sunnyWindow = runSunnyWindowEstimatorFromText(
-            rawText,
-            { ...options, enableAnalyzeLN: options.enableAnalyzeLN === true },
-            parser,
-        );
+        const windowOptions = {
+            ...options,
+            withGraph: options.withGraph === true,
+            enableAnalyzeLN: options.enableAnalyzeLN === true,
+        };
+        sunnyWindow = runSunnyWindowEstimatorFromText(rawText, windowOptions, parser);
+    }
+
+    // The profile must use the same Fixed Density algorithm as the displayed RC/LN values.
+    let fixedDensityProfileResult = null;
+    const isFourKeyMania = parsedSummary.gameMode === "3" && parsedSummary.columnCount === 4;
+    if (options.withProfileGraph === true && isFourKeyMania) {
+        try {
+            fixedDensityProfileResult = calculateFixedDensityProfile(parser, options.speedRate ?? 1);
+            profileGraph = fixedDensityProfileResult.profile;
+        } catch {
+            profileGraph = null;
+        }
     }
 
     // 6. 6K 定数：display6kLevel && 6K 时按归一化后 star（6K 下恒为 Sunny sr）换算，2 位小数。
@@ -266,9 +320,10 @@ export async function runAnalysisPipeline({ rawText, estimatorAlgorithm, options
     let fixedDensityValue = Number.NaN;
     let fixedDensityLnValue = Number.NaN;
     let fixedDensityError = null;
-    if (options.withFixedDensity) {
+    if (options.withFixedDensity && isFourKeyMania) {
         try {
-            const fixedDensity = calculateFixedDensity(parser, options.speedRate ?? 1);
+            const fixedDensity = fixedDensityProfileResult
+                || calculateFixedDensity(parser, options.speedRate ?? 1);
             fixedDensityValue = fixedDensity.rcValue;
             fixedDensityLnValue = fixedDensity.lnValue;
         } catch (err) {
@@ -334,6 +389,7 @@ export async function runAnalysisPipeline({ rawText, estimatorAlgorithm, options
         actualEstimatorAlgorithm,
         sunnyStar,
         sunnyWindow,
+        profileGraph,
         sixKConst,
         vibro,
         ...(options.withPpMetrics === true ? { ppMetrics } : {}),

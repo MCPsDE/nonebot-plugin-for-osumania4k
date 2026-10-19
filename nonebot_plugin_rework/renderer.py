@@ -20,8 +20,11 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import tempfile
 import threading
+import sys
 import time
+import types
 from dataclasses import dataclass
 from functools import partial
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
@@ -83,7 +86,7 @@ _READY_CHECK_JS = r"""
   const overlayVisible = Boolean(overlay && !overlay.hidden);
   const statusText = status ? (status.textContent || '').trim() : '';
   return {
-    ready: Boolean(star) && text !== '' && text !== '-' && !star.classList.contains('loading'),
+    ready: Boolean(star) && Boolean(status && status.classList.contains('ok')),
     overlayVisible: overlayVisible,
     // 插件内部报错（状态行以 [Error] 开头）时不再等待，直接按当前画面出图
     error: /^\s*\[error\]/i.test(statusText),
@@ -109,6 +112,86 @@ class RenderState:
     osu_text: str = ""
     background: bytes | None = None
     settings_json: str = ""
+    reference_metrics_json: str = "{\"sunnyRework\": null, \"sunnyEstDiff\": null, \"osuSr\": null}"
+    analysis_options_json: str = "{\"speedRate\": 1, \"odFlag\": null, \"cvtFlag\": null, \"modCodes\": []}"
+
+
+def _prepare_sibling_toolkit() -> None:
+    """Expose only the sibling toolkit packages needed by the reference algorithms."""
+    root_path = Path(__file__).resolve().parents[2] / "nonebot_plugin_osumania_toolkit"
+    packages = {
+        "nonebot_plugin_osumania_toolkit": root_path,
+        "nonebot_plugin_osumania_toolkit.algorithm": root_path / "algorithm",
+        "nonebot_plugin_osumania_toolkit.algorithm.estimator": root_path / "algorithm" / "estimator",
+        "nonebot_plugin_osumania_toolkit.algorithm.rework": root_path / "algorithm" / "rework",
+        "nonebot_plugin_osumania_toolkit.parser": root_path / "parser",
+        "nonebot_plugin_osumania_toolkit.data": root_path / "data",
+        "nonebot_plugin_osumania_toolkit.api": root_path / "api",
+    }
+    if str(root_path.parent) not in sys.path:
+        sys.path.insert(0, str(root_path.parent))
+    for name, package_path in packages.items():
+        module = sys.modules.get(name)
+        if module is None:
+            module = types.ModuleType(name)
+            module.__package__ = name
+            module.__path__ = [str(package_path)]
+            sys.modules[name] = module
+
+def _calculate_reference_metrics(
+    osu_text: str,
+    speed_rate: float = 1.0,
+    od_flag: str | float | None = None,
+    cvt_flag: str | None = None,
+) -> dict[str, float | str | None]:
+    """Calculate the two labels with the sibling toolkit's algorithms."""
+    temporary_path: Path | None = None
+    try:
+        _prepare_sibling_toolkit()
+        try:
+            from nonebot_plugin_osumania_toolkit.algorithm.estimator.sunny import estimate_sunny_result
+            from nonebot_plugin_osumania_toolkit.algorithm.official import calculate_official_sr
+        except ModuleNotFoundError:
+            from src.plugins.nonebot_plugin_osumania_toolkit.algorithm.estimator.sunny import estimate_sunny_result
+            from src.plugins.nonebot_plugin_osumania_toolkit.algorithm.official import calculate_official_sr
+
+        with tempfile.NamedTemporaryFile(
+            mode="w",
+            encoding="utf-8",
+            suffix=".osu",
+            delete=False,
+        ) as temporary_file:
+            temporary_file.write(osu_text)
+            temporary_path = Path(temporary_file.name)
+
+        sunny_star = None
+        sunny_est_diff = None
+        official_star = None
+        try:
+            sunny_result = estimate_sunny_result(str(temporary_path), speed_rate, od_flag, cvt_flag)
+            sunny_star = float(sunny_result["star"])
+            sunny_est_diff = str(sunny_result["estDiff"])
+        except Exception as exc:  # noqa: BLE001
+            logger.info("Sunny 参考段位不可用：%s", exc)
+        try:
+            value = float(calculate_official_sr(str(temporary_path), speed_rate))
+            official_star = value if value > 0.0 else None
+        except Exception as exc:  # noqa: BLE001
+            logger.info("osu!mania 官方 SR 不可用：%s", exc)
+        return {
+            "sunnyRework": sunny_star if sunny_star == sunny_star else None,
+            "sunnyEstDiff": sunny_est_diff,
+            "osuSr": official_star if official_star is not None and official_star == official_star else None,
+        }
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("参考插件难度计算失败：%s", exc, exc_info=True)
+        return {"sunnyRework": None, "sunnyEstDiff": None, "osuSr": None}
+    finally:
+        if temporary_path is not None:
+            try:
+                temporary_path.unlink(missing_ok=True)
+            except OSError:
+                pass
 
 
 def _image_content_type(data: bytes) -> str:
@@ -167,6 +250,20 @@ class _StaticHandler(SimpleHTTPRequestHandler):
 
         if route == "/settings.json":
             self._send_bytes(self.state.settings_json.encode("utf-8"), "application/json; charset=utf-8")
+            return
+
+        if route == "/rework/reference-metrics":
+            self._send_bytes(
+                self.state.reference_metrics_json.encode("utf-8"),
+                "application/json; charset=utf-8",
+            )
+            return
+
+        if route == "/rework/analysis-options":
+            self._send_bytes(
+                self.state.analysis_options_json.encode("utf-8"),
+                "application/json; charset=utf-8",
+            )
             return
 
         return super().do_GET()
@@ -310,12 +407,39 @@ class Renderer:
                     self._server = None
 
     # ------------------------------------------------------------------ 渲染
-    async def render(self, osu_text: str, background: bytes | None = None) -> bytes:
+    async def render(
+        self,
+        osu_text: str,
+        background: bytes | None = None,
+        *,
+        speed_rate: float = 1.0,
+        od_flag: str | float | None = None,
+        cvt_flag: str | None = None,
+        mod_codes: tuple[str, ...] = (),
+    ) -> bytes:
         """渲染单张谱面，返回卡片 PNG 字节。"""
         async with self._lock:
             await self._ensure_browser()
             self._state.osu_text = osu_text
             self._state.background = background
+            safe_rate = float(speed_rate) if float(speed_rate) > 0 else 1.0
+            self._state.analysis_options_json = json.dumps(
+                {
+                    "speedRate": safe_rate,
+                    "odFlag": od_flag,
+                    "cvtFlag": cvt_flag,
+                    "modCodes": list(mod_codes),
+                },
+                separators=(",", ":"),
+            )
+            reference_metrics = await asyncio.to_thread(
+                _calculate_reference_metrics,
+                osu_text,
+                safe_rate,
+                od_flag,
+                cvt_flag,
+            )
+            self._state.reference_metrics_json = json.dumps(reference_metrics, separators=(",", ":"))
 
             started = time.perf_counter()
             logger.info(
@@ -396,8 +520,6 @@ class Renderer:
         has_error = status_text.startswith("[Error]")
 
         star = str(info["star"]).strip()
-        if not has_error and (not star or star == "-"):
-            raise RenderError("插件未能产出分析结果（星等为空）。")
 
         if has_error:
             # 插件内部报错时仍会画出卡片，按当前状态直接截图
