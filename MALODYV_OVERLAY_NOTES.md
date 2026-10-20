@@ -73,9 +73,35 @@
 - 同日仅部署 `MalodyV.ReworkOverlay.Plugin.dll` 与专属 `BepInEx/plugins/MalodyVReworkOverlay` 目录；部署前确认游戏和伴侣进程均未运行，部署后 `MalodyVThemeLoader` 目录哈希未变。没有替换 BepInEx，也没有删除/重建 `BepInEx/plugins`。
 - 未为本轮回归启动游戏，避免节奏游玩期间产生额外 CPU/IO 负担；因此 IL2CPP 运行时 Hook、Mod/Turbo 切换与结算显隐仍待下次正常进入大厅/房间时观察。游戏侧只在选谱、Mod/Turbo 面板关闭、房间配置和场景事件时处理，不做逐帧/定时轮询；伴侣分析在独立进程执行。
 
+## 2026-10-20 Mod/Turbo 与窗口回归
+
+- 旧版本通过“第一个浮点字段”猜 Turbo 速度，在 IL2CPP 混淆类型下可能读到无关值，日志曾出现 `14.27x`；游戏源码中的 `CustomJudgeProfile.audioSpeed` 合法范围是 `0.5–2.0`。现改为按 `audioSpeed` 名称读取字段或属性，并拒绝超范围值，避免异常值污染后续谱面分析。
+- 预览状态必须读取 `PlayInfo.Local.Mod`。`ModForPlay` 只在进入游玩时经过 `Validate()`，并会移除 Rush/Dash/Slow；若用它做大厅预览，Mod 切换会落后一拍或丢失倍速。面板关闭与房间配置事件在状态提交后通过一次延迟主线程刷新触发，不使用轮询。
+- 分析签名现在包含有效 Mod、倍速、模式、随机种子和 Turbo 标量字段；关闭 Mod/Turbo 后从原始谱面重新加载，缓存不会继续复用已转换谱面。读取状态不可靠时清理旧卡片，不能把旧结果当成当前结果。
+- 卡片 WebView 之前有 `18px` body padding、主卡片半透明白边和右下三斜线握把，导致拖动/缩放区域跑到可见卡片外。现已移除 padding、主卡片外层 border/伪元素边框和握把；窗口边缘 `12px` 优先进行八方向缩放，其余区域按住拖动。
+- 管理窗口改为半透明渐变玻璃层、透明控件面和高对比文字；玻璃效果只作用于背景/边框，不对文字施加模糊，避免设置窗口难以阅读。
+- 本轮启动验证确认插件 `1.3.2`、伴侣窗口和 BepInEx 加载正常。仍需在大厅和联机房间实际切换一次 Turbo/Mod，检查日志中的 `speed=` 与卡片签名随状态变化；不能在游玩中做部署或高负载诊断。
+
+## 2026-10-20 启动同步与 Turbo 读取故障
+
+- 伴侣启动曾等待 GitHub 清单/归档同步后才启动本地卡片 HTTP 服务和命名管道；远程请求慢或失败会延迟游戏选谱消息接收。现调整为先用随包卡片启动本地服务，再做远程同步；仅当随包卡片入口缺失时才等待远程恢复。
+- 当前远程 Bot 清单请求返回 HTTP 200，随包 `nonebot_plugin_rework` 哈希与清单 `D072B4778817635C4091CBEFD3000C404F5C5AADA619844720436FB2C6A2D6D1` 一致，故同步失败不是本地卡片目录内容不一致。伴侣运行期间仍需观察其具体网络异常消息。
+- 当前 BepInEx 日志证明大厅选谱 Hook 已调用，但 Turbo 倍速成员读取失败后原逻辑清空了卡片。倍速读取现在优先使用游戏 `PlayInfo.PlaySpeed`，其次只读命名为 `audioSpeed` 的成员；严禁将 `catchSpeed`（下落流速）当成音频倍速。两者皆不可用时只以中性 `1.0x` 继续显示，并记录一次运行时成员诊断，不清空当前谱面。
+- 当前游戏及伴侣进程仍运行中；源码可以编译验证，但部署 DLL/伴侣文件必须等两进程退出后再做，避免运行时文件覆盖或额外风险。
+- 实际启动确认远程清单请求成功但归档校验报 SHA-256 不匹配：清单为 `D072...`，GitHub ZIP 内目录为 `97C9...`。160 个路径完全一致，差异来自 Windows 工作副本的混合换行与 GitHub ZIP 的 LF 文本换行。目录哈希现对 `.css/.html/.js/.json/.mjs/.py/.txt` 规范为 LF，二进制仍按原字节校验；Bot 与 overlay 两个清单生成脚本需同步使用同一算法。
+
 ## 维护约束
 
 - `Emiria` 仅作只读参考。
 - overlay 在谱面身份或 `PlayInfo.Local` 的有效分析 Mod/Turbo 状态事件变化时重算；禁止逐帧或定时轮询游戏状态。
 - 管理窗口与游戏顶层卡片窗口由 companion 程序提供；继续复用现有 HTML/CSS/JS 页面。
 - 若需支持 `.tja`、BMS 等额外格式，必须先按 `IndexInFile` 解析对应难度并转换，不能把不同模式的 notes 合并。
+
+## 2026-10-20 Turbo 与编辑器实时预览
+
+- Turbo 面板的 `OnDisable` 会先把新配置写入 Intent，再由调用方提交到 `PlayInfo.Local`。Postfix 立即读取会有时序竞态；现在通过 Unity `Invoke` 延迟 150ms 后读取，不做 Update/协程轮询。启用 Turbo 时只取 `customJudge.audioSpeed`，范围外回退中性 `1.0x`，不得覆盖成 Rush/Dash/Slow；Turbo 不存在时才按 Rush `1.5x`、Dash `1.2x`、Slow `0.8x` 处理，且绝不读取 Catch 的 `catchSpeed`。
+- 编辑器当前谱面不能从磁盘源文件获得，因为未保存的改动只在 `EditChartManager` 中。`EditChartManager.Save()` 会覆盖谱文件并写回数据库元信息，禁止为了分析调用；预览改为从 manager 当前 notes/timing 构建内存 `.mc` JSON，经 IPC 交给 companion 转换分析，不写临时谱文件。
+- `EditChartManager` 与 `CommandManager` 所在程序集/类型在游戏启动阶段尚未加载；不要在 BepInEx `Load()` 中提前解析它们。应先 Hook 已加载的 `SceneEditor.Start`，从该场景实例取得 chart/command manager 后再安装 `CommandManager.JustDoIt(CommandBase,bool)` Hook。
+- 编辑器变更 Hook 限定 `CommandBaseNote` 子类及音符命令类型，可覆盖新增、删除、修改以及撤销/重做；时间线、音效等非音符命令不触发更新。高频音符命令由 Unity 主线程一次性延迟 250ms 合并，避免逐操作启动分析，也不轮询。
+- 插件项目使用 C# 10，不能使用 C# 11 list pattern 查找 Hook 签名；反射查找参数需要显式检查数量和类型。编辑器 manager 创建时只做一次初始预览，之后只在音符命令事件更新，退出编辑器后回退到当前选谱状态。
+- Turbo 音乐速度修改需要在大厅和联机房间均验证：观察面板关闭后 `speed=` 与卡片分析签名更新，并确认没有将流速误读为音乐速度。编辑器验证需检查未保存的增删、移动、长条修改和撤销/重做都能更新，而纯 UI/时间轴操作不会触发分析。
