@@ -97,6 +97,13 @@
 - 管理窗口与游戏顶层卡片窗口由 companion 程序提供；继续复用现有 HTML/CSS/JS 页面。
 - 若需支持 `.tja`、BMS 等额外格式，必须先按 `IndexInFile` 解析对应难度并转换，不能把不同模式的 notes 合并。
 
+## 2026-10-20 远程 Bot 同步哈希排序故障
+
+- 部署 `1.3.11` 后，管理窗实际启动仍提示 `Remote bot card archive failed SHA-256 verification`。远程清单、GitHub ZIP 和已部署目录的规范哈希均为 `97C9B017...`，但伴侣程序算出的 Windows 本地哈希为 `8A3F1DD8...`。
+- 根因是同步器先按 Windows 原生反斜杠路径排序，再把路径改为 `/` 后参与哈希；manifest 生成器则先统一成 `/` 再排序，顺序不同会造成同一批文件哈希不一致。修复为排序前先统一相对路径分隔符；验证后 Windows、本地、ZIP 与 manifest 均得到 `97C9B017...`。
+- 这类错误会使每次启动都尝试下载归档并误报同步失败，即使文件内容完全相同；以后目录哈希实现必须对排序键和哈希路径使用同一种规范化路径。
+- `1.3.12` 部署后独立启动管理窗，状态显示“Bot 卡片目录与远程版本一致”；远程 overlay manifest 的 host/plugin SHA-256 与部署文件一致。验证时游戏保持关闭。
+
 ## 2026-10-20 Turbo 与编辑器实时预览
 
 - Turbo 面板的 `OnDisable` 会先把新配置写入 Intent，再由调用方提交到 `PlayInfo.Local`。Postfix 立即读取会有时序竞态；现在通过 Unity `Invoke` 延迟 150ms 后读取，不做 Update/协程轮询。启用 Turbo 时只取 `customJudge.audioSpeed`，范围外回退中性 `1.0x`，不得覆盖成 Rush/Dash/Slow；Turbo 不存在时才按 Rush `1.5x`、Dash `1.2x`、Slow `0.8x` 处理，且绝不读取 Catch 的 `catchSpeed`。
