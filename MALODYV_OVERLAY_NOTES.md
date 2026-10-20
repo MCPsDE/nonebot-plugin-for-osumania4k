@@ -105,3 +105,11 @@
 - 编辑器变更 Hook 限定 `CommandBaseNote` 子类及音符命令类型，可覆盖新增、删除、修改以及撤销/重做；时间线、音效等非音符命令不触发更新。高频音符命令由 Unity 主线程一次性延迟 250ms 合并，避免逐操作启动分析，也不轮询。
 - 插件项目使用 C# 10，不能使用 C# 11 list pattern 查找 Hook 签名；反射查找参数需要显式检查数量和类型。编辑器 manager 创建时只做一次初始预览，之后只在音符命令事件更新，退出编辑器后回退到当前选谱状态。
 - Turbo 音乐速度修改需要在大厅和联机房间均验证：观察面板关闭后 `speed=` 与卡片分析签名更新，并确认没有将流速误读为音乐速度。编辑器验证需检查未保存的增删、移动、长条修改和撤销/重做都能更新，而纯 UI/时间轴操作不会触发分析。
+
+## 2026-10-20 调度、Turbo 与缩放故障修复
+
+- 运行日志证实 `RefreshScheduler.ScheduleChartRefresh()` 在 `UnityEngine.MonoBehaviour.CancelInvoke(String)` 触发 IL2CPP `NullReferenceException`，导致 Mod/Turbo Harmony 回调中断。移除注入的 MonoBehaviour 调度器；改用可重置的一次性 `System.Threading.Timer` 做事件合并，再通过捕获的 Unity `SynchronizationContext.Post` 回主线程读取游戏状态。Timer 线程不访问 Unity 对象，主线程没有逐帧或固定间隔的谱面/Mod 轮询。
+- Turbo 错读根因是只扫描 PlayInfo 属性并用“含 audioSpeed 成员”模糊挑选，运行时误选到 `Malody.Chart.iqy`，真正的 `customJudge` 是 PlayInfo 字段。现在优先按 `CustomJudgeProfile` 类型解析字段/属性并缓存其 `audioSpeed` 成员；Turbo 优先于 Rush/Dash/Slow，严格不读取 Catch 的 `catchSpeed`。`PanelJudge.OnDisable` 后仍延迟 150ms 读取，使面板结果有时间提交给 `PlayInfo.Local`。
+- 编辑器 Hook 失败根因是从 manager 实例模糊枚举方法，并在取不到命令管理器时错误回退到 chart manager。现在通过 `SceneEditor.GetCommandManager()` 或其 `commandManager` 字段取得真实实例，并从已加载游戏程序集精确定位 `Malody.Edit.Command.CommandManager.JustDoIt(CommandBase, bool)`。初始快照和音符命令（含撤销/重做）使用一次性去抖；时间轴/界面操作不触发，分析读取编辑器内存数据，不调用 `Save()`。
+- Overlay 边缘与角落缩放统一锁定卡片 `515:610` 比例：横边/竖边都会联动调整宽高，角落按拖动较明显的轴决定尺度；对边/角作为锚点。WebView 内固定基准布局整体 CSS 等比缩放，避免只改变容器后内容重排。管理窗使用明确的 Segoe UI 字体、较大的辅助字号和提高后的青色系文字对比。
+- 当前实现构建版本为 `1.3.5`；部署后的游戏日志仍需检查精确 Hook 安装、Mod/Turbo 实际切换和编辑器音符变更。游戏实际游玩期间不进行诊断性轮询或高负载检查。
