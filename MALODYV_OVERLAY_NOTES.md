@@ -42,9 +42,10 @@
 
 ## 独立安装器与 Overlay
 
-- 安装器工程：`malodyv_tools/installer`；单文件发布：`malodyv_tools/release/MalodyV.BepInExInstaller.exe`（自包含、压缩）。
-- 安装器从 BepInEx 官方 bleeding-edge 页面动态选择最新 Windows x64 IL2CPP 归档，并先检测 WebView2 Runtime；缺失时通过 Microsoft HTTPS 引导程序安装并验证运行时注册项。BepInEx 归档下载到游戏目录下的临时目录，校验 ZIP 路径并确认核心 DLL 存在，再替换运行时；失败时恢复旧运行时。替换前拒绝游戏仍在运行、目标目录是 reparse point 的情况。
-- 覆盖 `BepInEx` 时会把旧 `BepInEx/plugins` 原目录移动到新运行时，其他运行时文件按归档重建。当前机器现有的 `MalodyVThemeLoader` 因此会保留。安装器成品已构建，但没有运行它覆盖当前 `6.0.0-be.785` 安装。
+- BepInEx 安装器工程：只读参考仓库 `E:/Desktop/MalodyVThemeLoader`；当前发布为 `malodyv_tools/release/MalodyV-BepInEx-Installer-1.0.3.exe`（自包含、离线 payload）。
+- 安装器会在安装/修复前整体暂存旧 `BepInEx`，删除旧运行时、配置、缓存和 Doorstop 文件，即使它们由其他安装器安装；只复制回原有 `BepInEx/plugins`，然后安装固定版本 `6.0.0-be.785`。旧根目录 `winhttp.dll`、`doorstop_config.ini` 和 `.doorstop_version` 会被新 payload 替换，失败时回滚。目标目录或 `BepInEx/plugins` 为 reparse point 时拒绝操作。
+- 新安装器没有覆盖本机真实游戏目录；已在隔离假游戏目录完成首次安装、清理旧运行时、保留 plugins、替换 Doorstop、卸载和再次安装测试。
+- 2026-10-20 收到实际安装错误 `Access to the path ...\\MalodyV\\BepInEx is denied`。原因是 Steam 默认游戏路径位于 `Program Files (x86)`，但 `1.0.3` 没有声明 UAC 管理员执行级别，普通权限移动旧 `BepInEx` 时被 Windows 拒绝。`1.0.4` 已嵌入 `requireAdministrator` 应用清单，启动时由 Windows 请求提升；从 PE 资源确认清单存在，并用隔离目录对安装/修复/卸载流程回归通过。该版本仍未在真实游戏目录执行。
 - Overlay 发布目录：`malodyv_tools/overlay/release/MalodyVReworkOverlay`；BepInEx 插件 DLL 必须放在 `BepInEx\plugins` 根目录，伴侣程序与 Bot 目录放在 `BepInEx\plugins\MalodyVReworkOverlay` 子目录。此前把 DLL 和伴侣程序全部放进子目录时，目标 BepInEx 日志出现 `0 assemblies discovered`，因此发布脚本现在按该布局输出。
 - 游戏内插件以 .NET 6 编译，运行于 BepInEx IL2CPP；独立 WPF/WebView2 伴侣使用 self-contained .NET 8，提供管理窗口和透明置顶卡片，不依赖目标机器预装 .NET Desktop Runtime。卡片 HTML/CSS/JS、字体、WASM、ONNX、portable Python、NumPy 与参考算法源码一起打包，页面由本地 HTTP 服务供 WebView2 加载。
 - Overlay 关闭 WebSocket、联网更新和遥测；本地服务提供谱面文本、设置、背景图、参考难度与分析选项端点。页面复用当前卡片实现，不另画一套 UI。
@@ -59,7 +60,7 @@
 - BepInEx 发布目录完整保留 `nonebot_plugin_rework/`，包括 Python 插件源码和 `tosu_plugin/` 前端。卡片 HTTP 服务只从 `nonebot_plugin_rework/tosu_plugin` 读取，不回退到旧的 `Card` 副本，避免游戏卡片和 Bot 卡片各自漂移。
 - `malodyv_tools/overlay/Build-Release.ps1` 在 Bot 仓库工作树中执行时，会先调用 `scripts/Sync-BotPlugin.ps1`，将当前 `nonebot_plugin_rework/` 镜像到 BepInEx 子仓库；独立克隆没有上级 Bot 目录时，则使用子仓库内随版本控制提交的副本。镜像只排除运行时生成的 `__pycache__` 和 `.pyc`。
 - Bot 仓库根目录的 `bepinex-bot-manifest.json` 由 `scripts/Update-BepInExBotManifest.ps1` 生成。目录哈希使用相对路径（UTF-8、斜杠分隔）与文件字节组成，按 Ordinal 路径排序，忽略 `__pycache__` 与 `.pyc`；发布脚本、同步器必须使用相同算法。
-- 管理程序启动后先比较本地 Bot 目录哈希与 manifest。哈希不同时，只从固定的 `MCPsDE/nonebot-plugin-for-osumania4k` GitHub HTTPS 归档下载；会检查重定向主机、压缩与展开大小、条目数量、路径穿越和符号链接，再验证提取目录哈希。校验通过后在同一目录卷暂存并替换，失败保留旧目录；同步只操作 `nonebot_plugin_rework/`，不触碰 BepInEx 的其他插件。
+- 管理程序启动后先比较本地 Bot 目录哈希与 manifest。哈希不同时，只从固定的 `MCPsDE/nonebot-plugin-for-osumania4k` GitHub HTTPS 归档下载；会检查重定向主机、压缩与展开大小、条目数量、路径穿越和符号链接，再验证提取目录哈希。校验通过后在同一目录卷暂存并替换，失败保留旧目录；同步只操作 `nonebot_plugin_rework/`，不触碰 BepInEx 的其他插件。GitHub Raw TLS 不可用时会尝试可信镜像；所有远程清单都不可达时，只要随包目录哈希正确，就离线使用随包 Bot，不把 SSL 故障显示成阻断错误。
 - BepInEx 游戏插件自身计算其程序集 SHA-256，并读取独立仓库 `manifest.json` 对照版本与哈希；不一致时通过本地管道通知管理窗口显示可关闭提示。伴侣程序另行检查自身 EXE 哈希。提示不阻止游戏或卡片继续使用。
 - HTTPS 与 SHA-256 可发现传输损坏及归档/manifest 不一致，但 manifest 和归档来自同一 GitHub 账号，并非数字签名。如果仓库或账号被接管，攻击者可以同时替换内容与哈希；因此自动同步应限定信任固定个人仓库，并审阅提交。远程卡片 JavaScript 会在 WebView 中执行，这是卡片渲染本身所需的信任边界。
 - 发布前运行 `scripts/Update-BepInExBotManifest.ps1` 更新 Bot 仓库 manifest；然后从 Bot 仓库构建 `malodyv_tools/overlay/Build-Release.ps1`，提交 overlay 仓库内随包的原始插件目录、插件 DLL 哈希 manifest 和宿主代码。不要用 `git pull` 替换运行目录，也不要删除 `BepInEx/plugins`。
@@ -69,8 +70,8 @@
 
 - 安装器、伴侣窗口和 IL2CPP 插件源码均已本机编译；安装器 EXE、framework-dependent 伴侣程序与插件 DLL 随发布生成。
 - 当前部署保留了旧 Overlay 子目录和生成缓存的带时间戳备份，新的 DLL 位于 `BepInEx/plugins/MalodyV.ReworkOverlay.Plugin.dll`，伴侣程序位于 `BepInEx/plugins/MalodyVReworkOverlay`；部署前后未改变现有 `MalodyVThemeLoader` 文件。当前 BepInEx `6.0.0-be.785` 未被安装器覆盖。
-- 2026-10-20 构建游戏插件、self-contained 伴侣、安装器工程均通过，0 warning / 0 error；8 项 Node 测试及 8 项 Python 测试（另 7 个子测试）通过。portable Python 3.10.20 + NumPy 2.2.6 对真实 `.osu` 谱面完成 SunnyRework/OsuSR 冒烟（自定义 1.2x 速度）；冒烟首次发现 toolkit parser 依赖 `nonebot.log`，现由 `ReferenceMetrics.py` 提供无操作 logger shim，算法不依赖用户安装 NoneBot。发布 DLL、Host 与 `manifest.json` 哈希一致；Bot 源目录、随包目录和远程 manifest SHA-256 均为 `D072B477...2D6D1`。
-- 同日仅部署 `MalodyV.ReworkOverlay.Plugin.dll` 与专属 `BepInEx/plugins/MalodyVReworkOverlay` 目录；部署前确认游戏和伴侣进程均未运行，部署后 `MalodyVThemeLoader` 目录哈希未变。没有替换 BepInEx，也没有删除/重建 `BepInEx/plugins`。
+- 2026-10-20 构建游戏插件、self-contained 伴侣、BepInEx 安装器工程均通过，0 warning / 0 error；8 项 Node 测试及 8 项 Python 测试（另 7 个子测试）通过。portable Python 3.10.20 + NumPy 2.2.6 对真实 `.osu` 谱面完成 SunnyRework/OsuSR 冒烟（自定义 1.2x 速度）；冒烟首次发现 toolkit parser 依赖 `nonebot.log`，现由 `ReferenceMetrics.py` 提供无操作 logger shim，算法不依赖用户安装 NoneBot。发布 DLL、Host 与 `manifest.json` 哈希一致；当前发布包随包 Bot 目录 SHA-256 为 `97C9B017...1D97`。
+- 同日仅在隔离测试目录运行 `MalodyV-BepInEx-Installer-1.0.3.exe`，没有替换真实 BepInEx；测试确认旧运行时和 Doorstop 被清理、现有 `BepInEx/plugins` 文件哈希保持不变。测试脚本曾把安装器成功文本和退出码混入函数返回值，误报首次安装失败，现已只返回进程退出码；Doorstop 断言也改为检查旧内容被替换而不是路径消失。
 - 未为本轮回归启动游戏，避免节奏游玩期间产生额外 CPU/IO 负担；因此 IL2CPP 运行时 Hook、Mod/Turbo 切换与结算显隐仍待下次正常进入大厅/房间时观察。游戏侧只在选谱、Mod/Turbo 面板关闭、房间配置和场景事件时处理，不做逐帧/定时轮询；伴侣分析在独立进程执行。
 
 ## 2026-10-20 Mod/Turbo 与窗口回归
@@ -120,3 +121,11 @@
 - 编辑器 Hook 失败根因是从 manager 实例模糊枚举方法，并在取不到命令管理器时错误回退到 chart manager。现在通过 `SceneEditor.GetCommandManager()` 或其 `commandManager` 字段取得真实实例，并从已加载游戏程序集精确定位 `Malody.Edit.Command.CommandManager.JustDoIt(CommandBase, bool)`。初始快照和音符命令（含撤销/重做）使用一次性去抖；时间轴/界面操作不触发，分析读取编辑器内存数据，不调用 `Save()`。
 - Overlay 边缘与角落缩放统一锁定卡片 `515:610` 比例：横边/竖边都会联动调整宽高，角落按拖动较明显的轴决定尺度；对边/角作为锚点。WebView 内固定基准布局整体 CSS 等比缩放，避免只改变容器后内容重排。管理窗使用明确的 Segoe UI 字体、较大的辅助字号和提高后的青色系文字对比。
 - 当前实现构建版本为 `1.3.5`；部署后的游戏日志仍需检查精确 Hook 安装、Mod/Turbo 实际切换和编辑器音符变更。游戏实际游玩期间不进行诊断性轮询或高负载检查。
+
+## 2026-10-21 算法边界与难度曲线修复
+
+- `sunnyAlgorithm.js` 在丢弃首个音符后，对单音符/极短谱面、空有效区间、非有限 `DAll`、零权重、零分母等路径增加有限零结果保护；真正的解析失败仍返回原有错误码。图形输出同步保证时间和值数组不含 `NaN` 或 `Infinity`。
+- Fixed Density LN 图之前只把固定 100ms 采样点和全谱首尾放入时间轴，倍速后部分长条释放点落在采样点之间，导致活动 LN 分数看起来像累计量。现在时间轴保留每个音符的起止事件，并用统一的浮点时间键匹配事件；LN 曲线会在释放后回落，显示局部瞬时值。
+- RC/LN 图左侧由单个最高值标签改为五级动态刻度，同时增加对应的网格线；刻度根据当前图表最高值更新，不增加分析开销。
+- Bot 版本更新为 `1.1.2`，Overlay 更新为 `1.3.14`。本轮 Node 测试共 12 项全部通过；当前环境没有安装 `pytest`，Python 测试可用 `python -m unittest discover -s tests -p "test*.py"` 执行。
+- 新 Overlay 发布包的 Bot 目录 SHA-256 为 `41F1F954...2BC54B1`；发布 DLL 与宿主哈希已写入 `malodyv_tools/overlay/manifest.json`，发布脚本校验随包目录和源码目录一致。
