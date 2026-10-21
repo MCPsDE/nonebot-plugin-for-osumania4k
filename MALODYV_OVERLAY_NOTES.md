@@ -130,3 +130,11 @@
 - Bot 版本更新为 `1.1.2`，Overlay 更新为 `1.3.14`。本轮 Node 测试共 12 项全部通过；当前环境没有安装 `pytest`，Python 测试可用 `python -m unittest discover -s tests -p "test*.py"` 执行。
 - 新 Overlay 发布包的 Bot 目录 SHA-256 为 `41F1F954...2BC54B1`；发布 DLL 与宿主哈希已写入 `malodyv_tools/overlay/manifest.json`，发布脚本校验随包目录和源码目录一致。
 - 后续发现 LN 曲线在高密度长条图中仍会因离散按住/松手事件出现高频尖峰，视觉上变成厚带并遮挡 RC。现在直接复用 RC 的 `180ms` 局部平均窗口平滑 LN 序列，并将 LN SVG 线宽降为 `1.5`，保留局部趋势但避免反复抖动形成实心区域。该修复发布为 Bot `1.1.3`、Overlay `1.3.15`。
+
+## 2026-10-21 非 4K Sunny 曲线与平滑窗口
+
+- RC/LN Fixed Density 曲线的局部平均窗口从 `180ms` 调整为 `260ms`，RC 包络和 LN 线使用同一窗口，进一步压低短时间内的上下抖动，同时保留较长难度峰值。
+- 仅对 `Mode:3` 且 `CircleSize != 4` 的谱面启用 SunnyRework 分支。卡片继续使用统一的封面背景规则，左上双值框改为 `SunnyRework` 和 `OsuSR`，数值来自当前速率下的 SunnyRework 与官方 mania SR 参考计算；4K 仍使用 RC/LN Fixed Density，其他游戏模式仍遵循原有非 mania 显示逻辑。
+- 非 4K mania 的曲线直接来自 SunnyRework 的 `graph.times`/`graph.values`，不会把 Sunny 曲线误当成 RC/LN，也不会显示 LN 包络填充。图例会切换为单独的 `SunnyRework`，4K 返回时恢复 `RC`/`LN`。
+- 缓存键升级为 `profile-caption-v4-sunny-profile`，避免旧缓存把 4K RC/LN 或旧的空曲线复用到 5K 等谱面。
+- Bot 更新为 `1.1.4`，Overlay 更新为 `1.3.16`；发布前应重新生成 Bot 目录清单和 Overlay manifest，并运行全部 Node 回归测试。
