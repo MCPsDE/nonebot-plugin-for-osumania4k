@@ -129,3 +129,4 @@
 - RC/LN 图左侧由单个最高值标签改为五级动态刻度，同时增加对应的网格线；刻度根据当前图表最高值更新，不增加分析开销。
 - Bot 版本更新为 `1.1.2`，Overlay 更新为 `1.3.14`。本轮 Node 测试共 12 项全部通过；当前环境没有安装 `pytest`，Python 测试可用 `python -m unittest discover -s tests -p "test*.py"` 执行。
 - 新 Overlay 发布包的 Bot 目录 SHA-256 为 `41F1F954...2BC54B1`；发布 DLL 与宿主哈希已写入 `malodyv_tools/overlay/manifest.json`，发布脚本校验随包目录和源码目录一致。
+- 后续发现 LN 曲线在高密度长条图中仍会因离散按住/松手事件出现高频尖峰，视觉上变成厚带并遮挡 RC。现在直接复用 RC 的 `180ms` 局部平均窗口平滑 LN 序列，并将 LN SVG 线宽降为 `1.5`，保留局部趋势但避免反复抖动形成实心区域。该修复发布为 Bot `1.1.3`、Overlay `1.3.15`。
