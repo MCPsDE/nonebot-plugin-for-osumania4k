@@ -138,3 +138,18 @@
 - 非 4K mania 的曲线直接来自 SunnyRework 的 `graph.times`/`graph.values`，不会把 Sunny 曲线误当成 RC/LN，也不会显示 LN 包络填充。图例会切换为单独的 `SunnyRework`，4K 返回时恢复 `RC`/`LN`。
 - 缓存键升级为 `profile-caption-v4-sunny-profile`，避免旧缓存把 4K RC/LN 或旧的空曲线复用到 5K 等谱面。
 - Bot 更新为 `1.1.4`，Overlay 更新为 `1.3.16`；发布前应重新生成 Bot 目录清单和 Overlay manifest，并运行全部 Node 回归测试。
+
+## 2026-10-23 控制台字体、控件与自动更新（Overlay 1.3.17）
+
+- 独立控制台使用 WPF，并非网页。原勾选框仅设置文字样式，仍使用 Windows 默认模板；现用共享深色青蓝模板覆盖已选、未选、半选、悬停、按下、键盘焦点和禁用状态，保留 CheckBox 原生键盘与 UI Automation 行为。透明度滑块同步使用主题色。
+- 原 DropShadowEffect 施加在包含所有文字的父容器上，会让文字与整块内容一同离屏栅格化。阴影移到独立背景层；字体统一为 Segoe UI / Microsoft YaHei UI 回退，正文正常字重，使用灰度抗锯齿与 Display 文字度量，不再对所有文字强制像素吸附。
+- `ControlSizing` 按当前字体、字重、DPI、内边距和控件模板预留宽度，中英切换、快捷键捕获和 DPI 变化时重算。操作文字不裁剪、不省略、不靠缩小字号挤入；窗口最小宽度随完整文字增长。现有产品只提供深色玻璃主题。
+- 更新由“可关闭提示”改为启动时自动检查并自动安装，删除旧 UpdateCheckEnabled / UpdateManifestUrl 配置项。旧版 1.3.16 只有提示能力，必须先安装一次 1.3.17，之后发布新版才可自动更新。
+- 修复旧检查错误地在宿主子目录寻找 BepInEx DLL，以及只校验原生 apphost EXE 的问题：现在从 plugins 根目录校验插件 DLL，同时校验宿主 EXE 与实际含代码的宿主 DLL。版本较旧的远程清单不触发降级；同版本文件不一致触发修复。
+- 固定 GitHub Raw / jsDelivr 清单与版本化 GitHub Release ZIP，限制重定向、下载大小、解压大小和路径；完整 ZIP SHA-256 通过后才执行其中的已验证宿主。包内 manifest 不包含自身 ZIP 哈希，打包完成后将 ZIP 哈希写入仓库外部 manifest，避免哈希自引用。
+- 更新等待游戏进程退出事件后才下载、解压与安装，没有 Update 循环、定时轮询或游玩期间的大体积更新操作。临时宿主以 `--apply-update` 模式运行，在替换前等待旧 companion 退出；只替换宿主目录、插件 DLL、manifest，其他 plugins 与 LocalAppData 设置保留。
+- 同卷暂存与备份位于 `BepInEx/overlay-updates`，不能放在 plugins 中，否则递归 DLL 扫描可能重复加载旧插件。替换失败按逆序回滚，恢复启动带 `--update-recovery` 以防连续失败重启；下次正常启动再检查。更新失败不会破坏当前可用版本。
+- 临时更新器使用 `MalodyV.ReworkOverlay.Update.exe` 独立进程名，仍运行已校验的同一 apphost/DLL。游戏现有 StartCompanion 会把同名无窗口进程当作残留清理，因此不能直接以控制台的原进程名运行无窗口更新器。
+- 自动化检查覆盖版本/哈希、ZIP 越界、损坏包、文件占用回滚、其他插件保留，以及中英文、最小/正常窗口宽度、放大字体、100/125/150/200% 合成 DPI 渲染。DPI 渲染截图不是物理显示器实测；实际字体观感仍受系统与显示器影响。
+- 本次 75 项回归/界面检查通过；真实暂存安装器验证了替换、哈希、其他插件保留与控制台重启。GitHub Release 发布后，另一个独立测试目录故意损坏插件 DLL，由控制台启动时实际检测、下载发布包、校验、替换并重新启动，全程没有确认框，验证通过。
+- 发行 ZIP SHA-256：`35FC2F0A2D9DA646ED5AA5516E04B765BB388D380587316F974AF24540EEFB0D`；GitHub Release 资产返回的 SHA-256 与本地一致。版本化下载地址为 `https://github.com/MCPsDE/malodyv-rework-overlay/releases/download/v1.3.17/MalodyVReworkOverlay-1.3.17.zip`。
