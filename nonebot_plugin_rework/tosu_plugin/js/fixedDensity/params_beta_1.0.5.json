@@ -1,0 +1,373 @@
+{
+  "_comment": "Fixed Density beta_1.0.5 参考参数（与 js/fixedDensity/index.js 顶部常量一致；插件代码不读取本文件）。RC 合并 weakgate_smallweight；LN 为连续重叠 + OD/局部密度临界点 + RC 同款分位聚合的新模型。",
+  "version": "beta_1.0.5",
+  "rc": {
+    "params": {
+      "half_life_ms": 306.625,
+      "quantile": 0.94012709,
+      "extra_rate": 1.7044655999999996,
+      "extra_b": 2.337995528948387,
+      "extra_log_base": 4.012384,
+      "soft_beta": 0.346887,
+      "hand_imb_eta": 0.4,
+      "hand_imb_tau": 60.0,
+      "hand_imb_m0": 1.875,
+      "hand_imb_nps0": 3.05,
+      "hand_imb_half_life_ms": 5000.0,
+      "weak_gate_mode": 2,
+      "weak_gate_q0": 1.5625,
+      "weak_gate_imb_b": 0.35,
+      "weak_gate_imb_s": 0.0825,
+      "weak_gate_extra": 0,
+      "weak_gate_hand": 1,
+      "irr_gain_lane": 0.1,
+      "irr_gain_global": -0.06,
+      "irr_gain_cross": 0.0,
+      "irr_cross_scale": 1.0,
+      "irr_cross_alpha": 2.5,
+      "irr_cross_density": 2.48,
+      "irr_cross_window": 16
+    },
+    "map_knots": [
+      [
+        0.3,
+        1.6
+      ],
+      [
+        2.45,
+        1.6
+      ],
+      [
+        3.85,
+        0.9
+      ],
+      [
+        4.5,
+        2.0
+      ],
+      [
+        7.3,
+        2.0
+      ],
+      [
+        9.2,
+        1.0
+      ],
+      [
+        12.05,
+        0.9
+      ],
+      [
+        12.6,
+        0.6
+      ],
+      [
+        14.2,
+        0.8
+      ],
+      [
+        15.6,
+        1.0
+      ]
+    ],
+    "map_coef": [
+      2.409901630718964,
+      0.2499999999999991,
+      0.10871112679874252,
+      0.24999999999999994,
+      0.060000000000000005,
+      0.060000000000000005,
+      0.2416183267528521,
+      0.06000000000011716,
+      0.06000000000339295,
+      0.24999999999977487,
+      0.1042626288966196,
+      0.2124999999999158,
+      -0.039566345789796765
+    ],
+    "fit": {
+      "use_irr": false,
+      "use_chord": false,
+      "use_dur": false,
+      "C": 0.0,
+      "E": 0.0,
+      "D": -0.039566345789796765,
+      "D2": 0.0
+    }
+  },
+  "ln": {
+    "gamma_rel": 1.83134254,
+    "gamma_jack": 18.1113825,
+    "gamma_cross": 1.88969303,
+    "gamma_hold": 2.67786127,
+    "h": 5.07395755,
+    "c": 0.29415144,
+    "lin": 0.0,
+    "len_weight_gain": 1.0,
+    "hold_ref_ms": 40.0,
+    "absorb_gain": 0.25,
+    "rel_power": "mean_of_two_neighbours (v5, was L2/hypot)",
+    "rel_aggregation": "quantile(0.75)",
+    "jack": {
+      "response": "S_jack = w * h * sigmoid((LN_JACK_G50_MS - g) / LN_JACK_SLOPE_MS)",
+      "g50_ms": 28.0,
+      "slope_ms": 10.0,
+      "g_definition": "同轨下一按下的时间 - 该松手（同时松手组取均值）；g 为负表示重叠，沿同一 sigmoid 连续取值",
+      "values": {
+        "g=-20": 0.992,
+        "g=0": 0.941,
+        "g=25": 0.574,
+        "g=50": 0.1,
+        "g=75": 0.009,
+        "g=100": 0.0007
+      },
+      "note": "v6 起为单一解析式（无 clip/无分段、C∞ 连续）：g=50ms 处保留约 10% 冗余量而非归零；窄面缝（25ms）约为 50ms 的 5.7 倍；v4 的「临界间隙锚定 + 重叠多项式」已移除。"
+    },
+    "aggregate_quantile": 0.75,
+    "own_n_mode": 0,
+    "hold_ref_used_in_s_rel": false,
+    "rel_w_min": 0.25,
+    "uniformity": {
+      "applies_to": [
+        "S_rel"
+      ],
+      "cv_definition": "per lane: CV = sd(release gaps)/mean(release gaps)",
+      "cv_full_uniform_threshold": 0.45,
+      "floor_at_cv_zero": 0.08,
+      "curve": "floor + (1-floor)*min(1,CV/0.45)^0.7",
+      "rationale": "均匀的 LN 排列（如 Malody 转谱等间距面缝流）没有真正的锁手/松手需求；S_hold 不折扣",
+      "examples_200bpm_150ms_heads_chord4": {
+        "len50_gap100": 4.39,
+        "len75_gap75": 5.93,
+        "len100_gap50": 7.79,
+        "len125_gap25": 12.14,
+        "len150_gap0": 13.91,
+        "single_lane_len100_gap50": 6.65,
+        "alternating_50_100_irregular": 13.12
+      }
+    },
+    "gamma_adj": 0.5,
+    "adjacency": {
+      "definition": "S_adj/event = clip(1 - d/W_od, 0, 1) * max(w, LN_REL_W_MIN)，d = 该松手到其它轨最近按下的距离",
+      "aggregation": "quantile(0.75) * absorb * valid",
+      "role": "k 的正项（LN_MULT_ADJ=0.5，随 rate 缩放），补回 S_jack 收缩后丢失的锁手/交接信号",
+      "sync_note": "四轨同时按下/松开的整齐排列 d≈W_od → S_adj≈0；交错/锁手时松手贴近别轨按下 → 有值"
+    },
+    "seam_discount": {
+      "formula": "seamPenalty = 1 - LN_SEAM_DISCOUNT * seamReg；seamReg = lnAggregate(softClip01(1 - |g - 50| / 25)) * valid",
+      "smooth": "softRelu(x)=0.5*(x+sqrt(x^2+1e-4))；softClip01(x)=softRelu(x)-softRelu(x-1)，处处可导，与 clip 偏差 < 1e-2",
+      "LN_SEAM_DISCOUNT": 0.8,
+      "LN_SEAM_GAP_MS": 50.0,
+      "LN_SEAM_TOL_MS": 25.0,
+      "semantics": "g = 同轨松手到下一次按下的间距；接近 50ms（频繁面缝/重叠交替）的占比越高，整谱 LN 乘子越低",
+      "adjacency_kernel": "softClip01(1 - d/W_od)，d = 松手到其他轨最近按下的距离",
+      "tuned_2026_10_28_v6d": {
+        "LN_A": 7.295514,
+        "LN_B": 0.021361376,
+        "gamma_rel": 2.263214,
+        "gamma_jack": 9.982506,
+        "gamma_adj": 0.548902,
+        "gamma_cross": 1.88969303,
+        "gamma_hold": 2.67786127,
+        "bench_rmse_102": 1.3558,
+        "love_is_war_ln": 9.902,
+        "reimei_ln": 23.201,
+        "koishi_ln": 13.405
+      }
+    },
+    "calibration": {
+      "formula": "LN = LN_A * ln(1 + LN_B * k * n)^LN_C",
+      "LN_A": 9.9905,
+      "LN_B": 0.012516,
+      "LN_C": 0.8739,
+      "inverse": "raw = expm1(((v - lnDelta)/LN_A)^(1/LN_C)) / (LN_B * nForLn)",
+      "why": "v6d 线性对数映射在高档（16+）系统性偏低；引入指数 C<1 让高 k 端压缩更小",
+      "tuned_2026_10_28_v6d_mapping": {
+        "bench_rmse_102_before": 1.3558,
+        "bench_rmse_102_after": 1.3362,
+        "bucket_bias_12_16": -0.72,
+        "bucket_bias_16_20": -1.74,
+        "love_is_war_ln": 9.901,
+        "reimei_ln": 23.602,
+        "koishi_ln": 13.485
+      }
+    }
+  },
+  "ln_calibration": {
+    "a": 5.6848,
+    "b": 0.037686,
+    "fit": "LN v6b 口径：JS 模型内部 k·n 对 103 张 LN 基准直接拟合 A/B（RMSE 0.9816；v6 门控版 0.9882、v5 0.8452）"
+  },
+  "ln_benchmark": {
+    "charts": 103,
+    "rmse_transformed": 0.9816,
+    "note": "LN v6b：S_jack 改单一 sigmoid（G50=28ms、slope=10ms，50ms 保留 10% 冗余）、新增 S_adj 头尾相邻性、均匀度折扣只作用于 S_rel、γ_rel×2、γ_jack×2.5、A/B 重拟合。242 谱回归 max|dRC|=0、max|dLN|=1.809（reimei 22.277→22.755、koishi 13.449→12.610、loveiswar 16.125→14.327）。基准 RMSE 比 v5 差 0.136，是 50ms 内 jack 响应收缩的代价。"
+  },
+  "charts": {
+    "_comment": "难度-进度双图的全局标定；运行时实际读取 config.js 的 fixedDensityCharts 节，这里仅作参考快照。",
+    "anchor_mode": "mean",
+    "anchor_mode_note": "mean=把 RC 平滑曲线的 rc_curve_anchor_quantile 分位（默认 0.875 = 曲线 q87.5）对齐到胶囊值，标线落在曲线 q87.5 附近、曲线整体被削减，仅顶部约 12.5% 越过标线；LN 仍按曲线加权均值对齐；quantile=旧行为，把逐物件 value 的 anchor_quantile_* 分位对齐胶囊值",
+    "anchor_quantile_rc": 0.75,
+    "anchor_quantile_ln": 0.88,
+    "rc_curve_anchor_quantile": 0.875,
+    "rc_curve_anchor_note": "RC 曲线锚点分位（0~1）：0.875 = 曲线 q87.5 对齐胶囊值；调大（如 0.95）进一步压低曲线，调小（如 0.80）抬高",
+    "ticks_above": 4,
+    "ticks_below": 8,
+    "min_tick_line_gap_px": 4,
+    "min_tick_label_gap_px": 7,
+    "max_tick_labels": 10,
+    "smooth_window_ms": 400,
+    "smooth_step_ms": 100,
+    "smooth_note": "曲线显示值 = 窗口内所有物件的加权均值，每 100ms 采样，空窗口取 0。RC 用 400ms 窗口；LN 取样点稀疏、赋值波动大，单独用 1000ms 窗口压平起伏（config.js fixedDensityCharts.smoothWindowMs / lnSmoothWindowMs）。",
+    "line_color_mode": "vertical_gradient_64_steps",
+    "ln_hide_anchor_below": 0.5,
+    "ln_hide_note": "LN 锚点 value < 0.5 时隐藏 LN 图（如 18th Dan：lnValue≈7e-8、LN% 0.5%，旧逻辑仍画一条 ln0 直线）",
+    "ln_smooth_window_ms": 1000,
+    "ln_smooth_step_ms": 100
+  },
+  "performance": {
+    "note": "beta_1.0.5 性能优化（数值不变）：核和、反函数、Sunny 复用；详见 docs/beta105-performance-optimization.md",
+    "kernel_sum": "windowed_recompute(reach=34*tau)，替代 O(N^2) 全扫描",
+    "hand_imbalance": "left/right/all 三路批量合并，不再每点建 Set",
+    "all_note_times_sorted": true,
+    "map_invert": "newton(warm_start, tol=1e-13, 16 iter, fallback bisection 60 iter)",
+    "sunny_window_reuse": "pipeline 复用的 Sunny 结果经 precomputedSunnyResult 传入，避免重复计算",
+    "numeric_regression": "242 谱面 max|Δrc|=2.331e-12 max|Δln|=1.208e-13 changed=0"
+  },
+  "lazer_cvt": {
+    "note": "beta_1.0.5 支持 lazer 的 Invert (IN) 与 Hold Off (HO)：FD 的 rc/ln 与两张图表都会按 mod 转换后的物件重新计算。",
+    "api": "calculateFixedDensity(source, rate, { cvtFlag: \"IN\" | \"HO\" | null })",
+    "in_semantics": "独立 parser 上执行 lazer ManiaModInvert：每轨取所有物件的起点（Note.StartTime 与 HoldNote.StartTime，不含 LN 终点）排序，相邻起点之间生成 LN，duration = max(diff/2, diff - beatLength/4)，原物件全部替换；每轨最后一个起点不生成新物件。",
+    "ho_semantics": "lazer ManiaModHoldOff：所有 LN 变单点（noteTypes & 128 清除、noteEnds 归零），RC 不变、LN 归零。",
+    "fallback": "转换抛错或产出 0 物件时回退未转换解析，FD 不因此抛错（避免图表/胶囊变 NaN）。",
+    "tests_2026_10_27": {
+      "reimei": {
+        "base": [
+          15.901045543119087,
+          22.580684682125856
+        ],
+        "IN": [
+          15.902,
+          19.876
+        ],
+        "HO": [
+          15.901,
+          0.0
+        ]
+      },
+      "koishi": {
+        "base": [
+          8.518622460372734,
+          13.443807746903849
+        ],
+        "IN": [
+          8.52,
+          13.452
+        ],
+        "HO": [
+          8.519,
+          0.0
+        ]
+      },
+      "theta18": {
+        "base": [
+          18.252540514411027,
+          7.195979285123993e-08
+        ],
+        "IN": [
+          18.252,
+          5.089
+        ],
+        "HO": [
+          18.253,
+          0.0
+        ]
+      },
+      "note": "修正版：IN 只取物件起点（与 lazer master ManiaModInvert 一致）；旧版误把 LN 终点也当分割点，导致 LN 谱物体数翻倍、rc 虚高。"
+    },
+    "regression": "cvtFlag=null 时 242 谱面 max|Δrc|=2.331e-12 max|Δln|=1.208e-13 changed=0",
+    "incompatible": "lazer 中 IN 与 HO、NR 互斥；modData 保持 IN 优先。"
+  },
+  "result_cache_fix": {
+    "note": "2026-10-27 修复结果缓存命中后 FD 图表不重绘：缓存快照需携带 fixedDensityChart（rc/ln 序列 + ticks + anchors）。",
+    "cache_key_version": "star-v4-fdchart",
+    "snapshot_field": "fixedDensityChart",
+    "hit_guard": "needComputed.fixedDensity 时要求 snapshot.fixedDensityChart 存在，否则按 miss 重算",
+    "max_chart_points": 20000,
+    "stale_frame_guard": "lastFixedDensityChartPayload 仅在 state.lastBeatmapIdentity 相同时复用",
+    "evidence": {
+      "old_build": "nomod2 曲线指纹与 IN 帧相同（命中旧快照，未重绘）",
+      "new_build": "nomod2 指纹与 nomod 一致，CACHE=0/1 一致",
+      "regression": "242 charts max|Δrc|=2.331e-12 max|Δln|=1.208e-13 changed=0"
+    }
+  },
+  "ln_v5_changes": {
+    "date": "2026-10-27",
+    "s_rel": "hypot→mean，去掉 h（并入 w），w 有下限 0.25",
+    "uniformity": "整轨松手间隔 CV 折扣（见 ln.uniformity）",
+    "calibration": "A 9.4270→8.9793，B 0.0073769→0.0081563",
+    "synth_200bpm_150ms_heads": "chord4 len75 13.18→3.51；len100 14.30→4.13；单轨 len75 11.66→2.85"
+  },
+  "ln_v6_changes": {
+    "date": "2026-10-27",
+    "s_jack": "单一 sigmoid：w·h·sigmoid((28 − g)/10)，C∞ 连续、无分段；g=50ms 保留 10% 冗余量，不再归零",
+    "adjacency": "新增 S_adj（头尾相邻性）正项，γ_adj=0.5",
+    "uniformity": "折扣只保留在 S_rel（S_jack / S_cross 不再折扣）",
+    "calibration": "γ_rel 0.9157→1.8313、γ_jack 7.2446→18.1114、A 8.9793→5.6848、B 0.0081563→0.037686",
+    "synth_200bpm_150ms_heads": "chord4 面长 50/75/100/125/150 → LN 4.39 / 5.93 / 7.79 / 12.14 / 13.91（v6 门控版 4.35 / 5.77 / 6.33 / 14.58 / 17.63；v5 2.28 / 3.51 / 4.13 / 4.77 / 5.52）",
+    "rationale": "用户要求 S_jack 不作分段、50ms 处保留冗余量而非直接归零，且全函数连续可导。",
+    "ln_map_layer_2026_10_28": {
+      "note": "v6e：指数映射 u = ln(1 + LN_B·k·n) 之后新增与 RC 同构的连续斜率映射层（softplus 基函数，C¹、无 clip），取代幂次映射 A·u^C。",
+      "exponential_mapping": {
+        "LN_B": 0.01647356
+      },
+      "slope_mapping": {
+        "LN_MAP_BETA": 0.07,
+        "LN_MAP_S0": 8.0091,
+        "LN_MAP_C": 0.4711,
+        "knots": [
+          0.1,
+          0.25,
+          0.42,
+          0.6,
+          0.8,
+          1.02,
+          1.28,
+          1.6
+        ],
+        "deltas": [
+          -0.8245,
+          -0.9193,
+          -0.8087,
+          -0.3216,
+          0.9749,
+          3.3042,
+          2.9582,
+          -4.2032
+        ],
+        "formula": "value = C + S0·u + Σ Δ_i·β·(φ_{i−1} − φ_i)，φ_i = β·softplus((u − u_i)/β)",
+        "inverse": "newton(warm start, 20 iter, tol 1e-13) + 兜底二分 u∈[−1,6]"
+      },
+      "fit_2026_10_28": {
+        "benchmark_rmse": 1.3234,
+        "prev_power_mapping_rmse": 1.337,
+        "mae": 0.9937,
+        "bias": -0.316,
+        "within_1": "59/103",
+        "within_2": "90/103",
+        "special_charts": {
+          "love_is_war": 9.866,
+          "reimei": 23.673,
+          "koishi": 13.557
+        },
+        "fit_weights": {
+          "love_is_war": 40,
+          "reimei": 8,
+          "koishi": 3
+        },
+        "smoothness_lambda": 0.1
+      },
+      "regression": "242 谱 max|Δrc|=2.33e-12；rc 未变，ln 随重标定变化（最大 −5.35，均为向基准目标收敛）"
+    }
+  }
+}

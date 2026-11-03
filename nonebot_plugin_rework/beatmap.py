@@ -2,7 +2,7 @@
 
 只需要读取 [General] / [Metadata] / [Difficulty] / [Events] 几个节，不解析
 HitObjects —— 真正的分析由 tosu 插件的前端完成。所有 osu! 模式都可渲染卡片，
-RC/LN 固定密度估算只对 4K mania 启用。
+RC/LN 固定密度估算对 4K/6K/7K mania 启用。
 """
 
 from __future__ import annotations

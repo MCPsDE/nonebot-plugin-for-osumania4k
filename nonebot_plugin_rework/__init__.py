@@ -4,7 +4,7 @@ from nonebot.plugin import PluginMetadata
 
 from .config import Config
 
-__version__ = "1.1.0"
+__version__ = "1.1.5"
 
 __plugin_meta__ = PluginMetadata(
     name="Rework 谱面分析",

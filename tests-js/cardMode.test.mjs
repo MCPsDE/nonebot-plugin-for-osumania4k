@@ -6,12 +6,22 @@ import { fileURLToPath } from "node:url";
 const sourcePath = new URL("../nonebot_plugin_rework/tosu_plugin/js/app/cardMode.js", import.meta.url);
 const source = await readFile(sourcePath, "utf8");
 const sourceUrl = `data:text/javascript;base64,${Buffer.from(source).toString("base64")}`;
-const { isFourKeyMania, resolveDifficultyText } = await import(sourceUrl);
+const { isFourKeyMania, isFixedDensityMania, resolveDifficultyText } = await import(sourceUrl);
 
-test("Fixed Density is limited to 4K mania", () => {
+test("4K classification excludes other key counts and game modes", () => {
     assert.equal(isFourKeyMania({ gameMode: "3", columnCount: 4 }), true);
     assert.equal(isFourKeyMania({ gameMode: "3", columnCount: 7 }), false);
     assert.equal(isFourKeyMania({ gameMode: "0", columnCount: 4 }), false);
+});
+
+test("Fixed Density values support 4K/6K/7K mania", () => {
+    for (const columnCount of [4, 6, 7]) {
+        assert.equal(isFixedDensityMania({ gameMode: "3", columnCount }), true);
+        assert.equal(isFixedDensityMania({ gameMode: "0", columnCount }), false);
+    }
+    for (const columnCount of [1, 5, 9, 10, 18]) {
+        assert.equal(isFixedDensityMania({ gameMode: "3", columnCount }), false);
+    }
 });
 
 test("other modes use the sibling Sunny tier fallback", () => {

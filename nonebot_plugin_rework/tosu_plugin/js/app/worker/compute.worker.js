@@ -15,23 +15,42 @@ import { runRoxyEstimatorFromText } from "../../estimator/roxyEstimator.js";
 
 const ESTIMATORS = { Sunny: "Sunny", Daniel: "Daniel", Azusa: "Azusa", Roxy: "Roxy" };
 
+/**
+ * postMessage with a clone-safety net。
+ *
+ * pipeline 结果里若混入不可 structured-clone 的值（class 实例、函数、getter 等），
+ * 直接 postMessage 会抛 DataCloneError，worker 侧没有任何回包，主线程只能等到
+ * 30s 超时或把 worker 当成 crashed。这里把失败转成普通 error 回包，让主线程走
+ * 既有错误/回退路径而不是卡死。
+ */
+function postSafe(payload) {
+    try {
+        self.postMessage(payload, []);
+    } catch (err) {
+        self.postMessage({
+            id: payload?.id,
+            error: `Worker result not cloneable: ${err?.message || String(err)}`,
+        });
+    }
+}
+
 self.onmessage = (event) => {
     const data = event.data || {};
 
-    // pipeline message: parse, estimators, derived values, pattern, Ett, and companions
+    // pipeline 消息：整段分析（解析/分派/归一化/SunnyWindow/派生/Interlude/Pattern/Ett/Companella 二次 Ett）
     // 一次往返。runAnalysisPipeline 是异步的（ett WASM + interlude），结果经 then 回传。
     if (data.type === "pipeline") {
         const { id, input } = data;
         if (!id || !input || !input.rawText) {
-            self.postMessage({ id, error: "Missing pipeline input" });
+            postSafe({ id, error: "Missing pipeline input" });
             return;
         }
         runAnalysisPipeline(input)
             .then((result) => {
-                self.postMessage({ id, result }, []);
+                postSafe({ id, result });
             })
             .catch((err) => {
-                self.postMessage({ id, error: err?.message || String(err) });
+                postSafe({ id, error: err?.message || String(err) });
             });
         return;
     }
@@ -39,7 +58,7 @@ self.onmessage = (event) => {
     // 原 4 估算器消息（保留不动）。
     const { id, osuText, options } = data;
     if (!osuText || !id) {
-        self.postMessage({ id, error: "Missing osuText or id" });
+        postSafe({ id, error: "Missing osuText or id" });
         return;
     }
 
@@ -75,9 +94,9 @@ self.onmessage = (event) => {
         if (result && typeof result === "object") {
             result = { ...result, actualEstimatorAlgorithm };
         }
-        self.postMessage({ id, result }, []);
+        postSafe({ id, result });
     } catch (err) {
-        self.postMessage({ id, error: err?.message || String(err) });
+        postSafe({ id, error: err?.message || String(err) });
     }
 };
 

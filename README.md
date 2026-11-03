@@ -2,7 +2,7 @@
 
 一个 **NoneBot2 + OneBot v11** 插件：在 QQ 里发送 `/rework2`，即可得到一张
 **ManiaMapAnalyser by Leo_Black（tosu 插件）风格**的 osu! 谱面分析卡片。固定密度 RC/LN
-估算仅对 4K mania 启用；Malody Key 谱面支持 1–18K 卡片转换。
+估算对 4K/6K/7K mania 启用；Malody Key 谱面支持 1–18K 卡片转换。
 
 本项目由 `fixed-density` 仓库的 `qqbot` 分支改造而来，只保留 `/rework2` 指令的功能，
 并把通信层从自建 OneBot 客户端迁移到 NoneBot2。仓库内自带渲染所需的
@@ -28,8 +28,13 @@ ManiaMapAnalyser 前端插件，无需另外准备 tosu 环境即可独立运行
 `.osu`（物件时间戳保留浮点毫秒）后交给渲染器；非 Key 模式不由聊天插件转换。
 
 **多模式卡片**：osu!standard、osu!taiko、osu!catch、非 4K mania 和 4K mania 均可生成
-分析卡片。左上角 RC/LN 固定密度值只在 4K mania 上计算；其他模式或键数显示 `-`，
-右上段位估计回退为参考插件可提供的 Sunny 结果。
+分析卡片。4K/6K/7K mania 计算左上角 RC/LN 固定密度值，并显示相应段位标签；
+其他键数继续使用参考插件的 SunnyRework / OsuSR 数值和 Sunny 段位，非 mania 模式显示 `-`。
+
+**算法与曲线**：固定密度算法同步自上游 `cb9b218`（`beta_1.0.7` / RC v13）。4K/6K/7K mania
+使用与上游相同的 RC、LN 独立难度曲线、段位刻度和整谱锚线；LN 事件不足或难度接近零时，
+按上游规则仅显示 RC 图。其他键数的 mania 保留原有 SunnyRework 曲线，其他游戏模式保持原有行为。
+6K/7K 使用上游对应段位刻度与标签；4K/6K/7K 旧图片缓存会自动失效，重新查询即按新算法出图。
 
 **容错行为**：缺少 `[HitObjects]` 的无效 osu! 文件会替换为错误提示图片；单张渲染失败
 也只会替换那一张，不会中断整包。Malody 转换边界与历史坑见

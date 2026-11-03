@@ -67,7 +67,7 @@ function triggerGraphScanEnter(view) {
     }, GRAPH_SCAN_ENTER_DURATION_MS);
 }
 
-function getInterpolatedPlaybackTime() {
+export function getInterpolatedPlaybackTime() {
     if (state.pauseDetectionEnabled && state.isPaused && Number.isFinite(state.frozenInterpMs)) {
         return state.frozenInterpMs;
     }

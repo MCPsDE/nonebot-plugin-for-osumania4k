@@ -10,6 +10,8 @@ import {
     profileGraphLegendRcEl,
     profileGraphLegendLnEl,
 } from "./appContext.js";
+import { hideAssignmentCharts, renderAssignmentCharts } from "./assignCharts.js";
+import { isFixedDensityMania } from "./cardMode.js";
 
 const VIEWBOX_LEFT = 8;
 const VIEWBOX_RIGHT = 252;
@@ -91,6 +93,7 @@ function setGraphLegend(source) {
 }
 
 export function clearProfileGraph() {
+    hideAssignmentCharts();
     if (!profileGraphWrapEl) {
         return;
     }
@@ -104,6 +107,13 @@ export function clearProfileGraph() {
 }
 
 export function renderProfileGraph(profileGraph) {
+    if (profileGraph?.source === "FixedDensity"
+        && isFixedDensityMania({ gameMode: "3", columnCount: profileGraph.keyCount })) {
+        clearProfileGraph();
+        renderAssignmentCharts(profileGraph);
+        return true;
+    }
+    hideAssignmentCharts();
     const times = Array.isArray(profileGraph?.times) ? profileGraph.times : [];
     const isSunnyProfile = profileGraph?.source === "SunnyRework";
     const sunnyValues = Array.isArray(profileGraph?.values) ? profileGraph.values : [];

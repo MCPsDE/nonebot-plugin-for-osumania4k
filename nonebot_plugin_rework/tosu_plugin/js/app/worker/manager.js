@@ -23,8 +23,27 @@ function ensureWorker() {
         worker = w;
         messageHandlerAttached = false;
 
-        w.addEventListener("error", () => {
-            rejectAllPending(new Error("Worker crashed"));
+        w.addEventListener("error", (event) => {
+            // 保留 event 细节（message/filename/lineno）便于定位崩溃原因；
+            // 默认的 "Worker crashed" 会丢掉这些信息，排查时无从下手。
+            const where = event?.filename
+                ? ` @ ${event.filename}:${event.lineno ?? "?"}:${event.colno ?? "?"}`
+                : "";
+            const detail = event?.message ? `: ${event.message}${where}` : "";
+            rejectAllPending(new Error(`Worker crashed${detail}`));
+            if (worker === w) {
+                try {
+                    w.terminate();
+                } catch {
+                    // Ignore terminate errors during cleanup.
+                }
+                worker = null;
+                messageHandlerAttached = false;
+            }
+        });
+        w.addEventListener("messageerror", () => {
+            // 反序列化失败同样会让 pending 永远等不到回包，按崩溃处理并重建。
+            rejectAllPending(new Error("Worker message deserialization failed"));
             if (worker === w) {
                 try {
                     w.terminate();

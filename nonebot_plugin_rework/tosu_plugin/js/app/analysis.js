@@ -84,7 +84,7 @@ import {
     hasReferenceMetrics,
     setReferenceDifficultyCaption,
 } from "./referenceMetrics.js";
-import { isFourKeyMania, resolveDifficultyText } from "./cardMode.js";
+import { isFixedDensityMania, resolveDifficultyText } from "./cardMode.js";
 import {
     currentEstimatorAlgorithm,
     isAutoDisplayEnabledNow,
@@ -376,8 +376,8 @@ export async function fetchBeatmapFile(reason) {
         fixedDensity: state.srText === "Fixed Density v1",
         pp: contentBarShows("ReworkPP") || state.srText === "ReworkPP",
     };
-    // 缓存键加版本段：曲线与右上角参考星数均为新增数据，旧快照必须失效。
-    const CACHE_KEY_STAR_UNIFIED_VERSION = "profile-caption-v4-sunny-profile";
+    // 4K/6K/7K 统一使用上游双图，旧 Sunny 曲线快照必须失效。
+    const CACHE_KEY_STAR_UNIFIED_VERSION = "profile-v6-fd-beta_1.0.7-4-6-7k";
     const cacheKey = `${CACHE_KEY_STAR_UNIFIED_VERSION}|${state.estimatorAlgorithm}|${state.lastBeatmapIdentity}|${state.modSignature}`;
     const isMetaDegraded = String(state.lastBeatmapIdentity || "").startsWith("meta:");
     let cached = null;
@@ -480,7 +480,17 @@ export async function fetchBeatmapFile(reason) {
                 };
                 const pipelineInput = { rawText, estimatorAlgorithm, options: pipelineOptions };
                 const wp = runInWorker(pipelineInput);
-                pipelineResult = wp ? await wp : await runAnalysisPipeline(pipelineInput);
+                if (wp) {
+                    try {
+                        pipelineResult = await wp;
+                    } catch (workerError) {
+                        console.warn("[WORKER_FALLBACK]", workerError?.message || workerError);
+                        if (isStaleRequest()) return;
+                        pipelineResult = await runAnalysisPipeline(pipelineInput);
+                    }
+                } else {
+                    pipelineResult = await runAnalysisPipeline(pipelineInput);
+                }
                 parsedInfo = pipelineResult.parsedSummary;
                 applyContentBarOverride(parsedInfo.columnCount);
                 if (!hasReferenceMetrics(referenceMetrics)) {
@@ -588,7 +598,7 @@ export async function fetchBeatmapFile(reason) {
         const needInterludeValue = isManiaMode && (state.srText === "InterludeSR"
             || state.diffText === "InterludeSR"
             || estimatorNeedsCompanellaData);
-        const needFixedDensityValue = isFourKeyMania(parsedInfo) && state.srText === "Fixed Density v1";
+        const needFixedDensityValue = isFixedDensityMania(parsedInfo) && state.srText === "Fixed Density v1";
         const needEtternaAnalysis = isManiaMode && (showsEtterna
             || needMsdValue
             || needVibroDetection
@@ -731,7 +741,7 @@ export async function fetchBeatmapFile(reason) {
             } else if (!cached && rawText) {
                 // 回退：pipeline 估算失败 → 主线程直接计算（软失败，不阻断，展示时回退 SR）。
                 try {
-                    const fd = calculateFixedDensity(rawText, state.speedRate);
+                    const fd = calculateFixedDensity(rawText, state.speedRate, { cvtFlag: state.cvtFlag });
                     fixedDensityValue = fd.rcValue;
                     fixedDensityLnValue = fd.lnValue;
                     if (isStaleRequest()) return;
@@ -988,14 +998,14 @@ export async function fetchBeatmapFile(reason) {
                 }, { skip: isMetaDegraded });
             }
 
-            const supportsFixedDensity = isFourKeyMania({
+            const supportsFixedDensity = isFixedDensityMania({
                 ...parsedInfo,
                 columnCount: parsedInfo.columnCount ?? rework?.columnCount,
             });
             const fixedDensityDifficultyText = state.srText === "Fixed Density v1" && supportsFixedDensity
                 ? [
-                    fixedDensityRcLabel(fixedDensityValue),
-                    fixedDensityLnLabel(fixedDensityLnValue),
+                    fixedDensityRcLabel(fixedDensityValue, parsedInfo.columnCount),
+                    fixedDensityLnLabel(fixedDensityLnValue, parsedInfo.columnCount),
                 ].filter(Boolean).join("\n")
                 : "";
             const difficultyText = resolveDifficultyText({
@@ -1010,7 +1020,7 @@ export async function fetchBeatmapFile(reason) {
         }
 
         if (!rework) {
-            const supportsFixedDensity = isFourKeyMania(parsedInfo);
+            const supportsFixedDensity = isFixedDensityMania(parsedInfo);
             setEstimateDifficultyText(supportsFixedDensity
                 ? "-"
                 : formatDiffForDisplay(referenceMetrics?.sunnyEstDiff));
@@ -1084,15 +1094,15 @@ export async function fetchBeatmapFile(reason) {
         // Fixed Density v1 的第二个框（ln_value）仅在选中该算法时出现，其余模式复位隐藏。
         hideFixedDensityLnValue();
 
-        const isNonFourKeyMania = String(parsedInfo.gameMode ?? "0") === "3"
-            && !isFourKeyMania({
+        const isNonFixedDensityMania = String(parsedInfo.gameMode ?? "0") === "3"
+            && !isFixedDensityMania({
                 ...parsedInfo,
                 columnCount: parsedInfo.columnCount ?? rework?.columnCount,
             });
 
         // 6K 定数: force override left capsule when enabled and map is 6K —
         // but never override an explicit ReworkPP / Fixed Density v1 srText selection.
-        if (isNonFourKeyMania) {
+        if (isNonFixedDensityMania) {
             showReferenceMetricValues(referenceMetrics?.sunnyRework, referenceMetrics?.osuSr);
         } else if (sixKConst !== null
             && state.srText !== "ReworkPP"
@@ -1121,12 +1131,12 @@ export async function fetchBeatmapFile(reason) {
                 leftCapsuleUnit = "SR";
             }
         } else if (state.srText === "Fixed Density v1") {
-            const supportsFixedDensity = isFourKeyMania({
+            const supportsFixedDensity = isFixedDensityMania({
                 ...parsedInfo,
                 columnCount: parsedInfo.columnCount ?? rework?.columnCount,
             });
             if (supportsFixedDensity && Number.isFinite(fixedDensityValue)) {
-                showFixedDensityValue(fixedDensityValue);
+                showFixedDensityValue(fixedDensityValue, parsedInfo.columnCount);
                 leftCapsuleUnit = "RC";
             } else if (!supportsFixedDensity) {
                 showFixedDensityValue(Number.NaN);
@@ -1136,7 +1146,7 @@ export async function fetchBeatmapFile(reason) {
                 leftCapsuleUnit = "SR";
             }
             if (supportsFixedDensity && Number.isFinite(fixedDensityLnValue)) {
-                showFixedDensityLnValue(fixedDensityLnValue);
+                showFixedDensityLnValue(fixedDensityLnValue, parsedInfo.columnCount);
             } else if (!supportsFixedDensity) {
                 showFixedDensityLnValue(Number.NaN);
             }

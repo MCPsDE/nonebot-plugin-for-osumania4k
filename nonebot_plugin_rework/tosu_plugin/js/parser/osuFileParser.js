@@ -1,4 +1,4 @@
-﻿import { xToColumn } from "./noteColumn.js";
+import { xToColumn } from "./noteColumn.js";
 
 function stringToInt(value) {
     return Math.trunc(Number.parseFloat(value));
@@ -278,19 +278,21 @@ export class OsuFileParser {
     }
 
     modIN() {
-    const startsByCol = {};
+    // lazer ManiaModInvert（rework 后版本）：每轨取所有物件的起点作为分割点
+    // （Note.StartTime 与 HoldNote.StartTime，**不含 LN 终点**），相邻分割点之间
+    // 生成一根 LN（duration = max(diff/2, diff - beatLength/4)），原物件全部替换。
+    const locationsByCol = new Map();
     for (let i = 0; i < this.columns.length; i += 1) {
-            const col = this.columns[i];
-            const start = this.noteStarts[i];
-            if (!startsByCol[col]) startsByCol[col] = [];
-            startsByCol[col].push(Number(start));
+            const col = Number(this.columns[i]);
+            if (!locationsByCol.has(col)) locationsByCol.set(col, []);
+            const start = Number(this.noteStarts[i]);
+            if (Number.isFinite(start)) {
+        locationsByCol.get(col).push(start);
+            }
     }
 
     const newObjects = [];
-    for (const colText of Object.keys(startsByCol)) {
-            const col = Number.parseInt(colText, 10);
-            const locations = startsByCol[col];
-
+    for (const [col, locations] of locationsByCol) {
             locations.sort((a, b) => a - b);
 
             for (let i = 0; i < locations.length - 1; i += 1) {

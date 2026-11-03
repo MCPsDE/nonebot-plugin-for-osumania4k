@@ -220,3 +220,154 @@
     opacity: 0.96;
     stroke-linecap: round;
 }
+
+/* ---- Fixed Density v1：RC / LN「难度-进度」双图 --------------------------------- */
+.fd-assign-charts {
+    display: flex;
+    align-items: stretch;
+    gap: 8px;
+    width: 100%;
+    margin-top: 8px;
+    min-width: 0;
+}
+
+.fd-assign-charts[hidden] {
+    display: none !important;
+}
+
+.fd-assign-charts.single .fd-assign-chart {
+    flex: 1 1 100%;
+}
+
+.fd-assign-chart {
+    position: relative;
+    flex: 1 1 0;
+    min-width: 0;
+    height: auto;
+    border-radius: 10px;
+    border: 1px solid rgba(198, 226, 255, 0.22);
+    background: linear-gradient(180deg, rgba(13, 18, 32, 0.76), rgba(22, 28, 47, 0.74));
+    box-shadow: inset 0 0 0 1px rgba(120, 160, 210, 0.16);
+    overflow: hidden;
+}
+
+.fd-assign-chart[hidden] {
+    display: none !important;
+}
+
+.fd-assign-svg {
+    display: block;
+    width: 100%;
+    height: auto;
+}
+
+.fd-assign-tag {
+    position: absolute;
+    top: 4px;
+    right: 6px;
+    font-family: "Outfit", sans-serif;
+    font-size: 8px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    color: rgba(213, 228, 255, 0.62);
+    pointer-events: none;
+}
+
+.fd-assign-tick {
+    stroke-width: 0.7;
+    opacity: 0.36;
+    stroke-dasharray: 2 2;
+}
+
+.fd-assign-tick-label {
+    font-family: "Outfit", sans-serif;
+    font-size: 6px;
+    font-weight: 600;
+    opacity: 0.95;
+}
+
+.fd-assign-seg {
+    fill: none;
+    stroke-width: 1.7;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.fd-assign-cursor {
+    stroke: rgba(255, 255, 255, 0.85);
+    stroke-width: 1.1;
+    stroke-dasharray: 2 2;
+}
+
+/* 图表出现时卡片改为自适应高度，避免固定高度把新增行裁掉 */
+.main-card.fd-charts,
+.main-card.fd-charts.bars-pattern,
+.main-card.fd-charts.bars-etterna,
+.main-card.fd-charts.bars-graph,
+.main-card.fd-charts.bars-none,
+.main-card.fd-charts.bars-pp,
+.main-card.fd-charts.bars-full {
+    height: auto;
+    min-height: 0;
+    max-height: none;
+}
+
+.fd-assign-halo path {
+    fill: none;
+    stroke: rgba(226, 238, 255, 0.22);
+    stroke-width: 3.4;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+/* 竖向堆叠 + 纵向放大：两张图各占整行，高度由 492x104 viewBox 决定（约 95px） */
+.fd-assign-charts {
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 10px;
+}
+
+.fd-assign-chart {
+    width: 100%;
+    flex: 0 0 auto;
+}
+
+.fd-assign-charts.single .fd-assign-chart {
+    flex: 0 0 auto;
+}
+
+.fd-assign-tag {
+    top: 5px;
+    right: 8px;
+    font-size: 9px;
+}
+
+.fd-assign-tick {
+    stroke-width: 0.8;
+    opacity: 0.4;
+}
+
+.fd-assign-tick-label {
+    font-size: 7px;
+}
+
+.fd-assign-seg {
+    stroke-width: 2;
+}
+
+.fd-assign-halo path {
+    stroke-width: 3.8;
+}
+
+/* 整谱 value 锚线：与左侧胶囊同值，实线高亮 */
+.fd-assign-anchor {
+    stroke-width: 0.9;
+    opacity: 0.9;
+}
+
+.fd-assign-anchor-label {
+    font-family: "Outfit", sans-serif;
+    font-size: 7px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+}

@@ -49,6 +49,33 @@ export const APP_CONFIG = {
         vibroJackspeedRatioThreshold: 0.95,
     },
 
+    // Fixed Density 难度-进度双图的全局标定（2026-10-27）
+    // anchorMode："mean"（默认）= 把 RC 平滑曲线自身的 rcCurveAnchorQuantile 分位
+    //   （默认 0.875 = 曲线 q87.5）对齐胶囊值，标线落在曲线 q87.5 附近、曲线整体被削减；
+    //   "quantile" = 旧行为，把逐物件 value 的 anchorQuantile* 分位平移到胶囊值
+    //   （平滑后均值天然低于该分位，曲线会整体偏低）。
+    // anchorQuantile*：仅 anchorMode="quantile" 时生效。
+    // rcCurveAnchorQuantile：RC 曲线锚点分位（0~1）；调大会进一步压低曲线。
+    // ticksAbove/Below：锚线以上/以下各画多少条整数标注线。
+    // smoothWindowMs/StepMs：曲线平滑窗口与采样步长（窗口内加权均值，空窗口=0）。
+    // lnSmoothWindowMs/StepMs：LN 曲线单独配置；LN 取样点稀疏，默认用 1000ms 窗口压平起伏
+    // （未配置时 lnSmoothStepMs 回退 smoothStepMs）。
+    fixedDensityCharts: {
+        anchorMode: "mean",
+        anchorQuantileRc: 0.75,
+        anchorQuantileLn: 0.88,
+        rcCurveAnchorQuantile: 0.875,
+        ticksAbove: 4,
+        ticksBelow: 8,
+        minTickLineGapPx: 4,
+        minTickLabelGapPx: 7,
+        maxTickLabels: 10,
+        smoothWindowMs: 400,
+        smoothStepMs: 100,
+        lnSmoothWindowMs: 1000,
+        lnSmoothStepMs: 100,
+    },
+
     graph: {
         viewboxWidth: 260,
         viewboxHeight: 86,

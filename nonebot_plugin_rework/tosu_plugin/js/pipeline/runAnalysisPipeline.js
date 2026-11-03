@@ -24,7 +24,8 @@ import { runMixedEstimatorFromText } from "../estimator/mixedEstimator.js";
 import { analyzePatternFromText } from "../patterns/service.js";
 import { analyzeEtternaFromText, DEFAULT_SCORE_GOAL as ETT_DEFAULT_SCORE_GOAL } from "../ett/index.js";
 import { calculateInterludeStar } from "../interlude/index.js";
-import { calculateFixedDensity, calculateFixedDensityProfile } from "../fixedDensity/index.js";
+import { calculateFixedDensity } from "../fixedDensity/index.js";
+import { isFixedDensityMania } from "../app/cardMode.js";
 
 const NORMALIZATION_ALGORITHMS = new Set(["Azusa", "Roxy", "Mixed"]);
 
@@ -301,26 +302,43 @@ export async function runAnalysisPipeline({ rawText, estimatorAlgorithm, options
     let sunnyWindow = null;
     let profileGraph = null;
     if (options.forceSunnyWindow) {
+        const precomputedSunnyResult = normalizationSunnyResult
+            || (actualEstimatorAlgorithm === "Sunny" || estimatorAlgorithm === "Companella"
+                ? selectedRework : null);
         const windowOptions = {
             ...options,
             withGraph: options.withGraph === true,
             enableAnalyzeLN: options.enableAnalyzeLN === true,
+            precomputedSunnyResult,
         };
         sunnyWindow = runSunnyWindowEstimatorFromText(rawText, windowOptions, parser);
     }
 
     // The profile must use the same Fixed Density algorithm as the displayed RC/LN values.
     let fixedDensityProfileResult = null;
-    const isFourKeyMania = parsedSummary.gameMode === "3" && parsedSummary.columnCount === 4;
-    if (options.withProfileGraph === true && isFourKeyMania) {
+    const supportsFixedDensity = isFixedDensityMania(parsedSummary);
+    if (options.withProfileGraph === true && supportsFixedDensity) {
         try {
-            fixedDensityProfileResult = calculateFixedDensityProfile(parser, options.speedRate ?? 1);
-            profileGraph = fixedDensityProfileResult.profile;
+            fixedDensityProfileResult = calculateFixedDensity(parser, options.speedRate ?? 1, {
+                cvtFlag: options.cvtFlag ?? null,
+            });
+            profileGraph = {
+                source: "FixedDensity",
+                keyCount: parsedSummary.columnCount,
+                rc: fixedDensityProfileResult.rcSequence,
+                ln: fixedDensityProfileResult.lnSequence,
+                rcTicks: fixedDensityProfileResult.rcTicks,
+                lnTicks: fixedDensityProfileResult.lnTicks,
+                rcAnchor: Number.isFinite(fixedDensityProfileResult.rcAnchor?.raw)
+                    ? fixedDensityProfileResult.rcAnchor : null,
+                lnAnchor: Number.isFinite(fixedDensityProfileResult.lnAnchor?.raw)
+                    ? fixedDensityProfileResult.lnAnchor : null,
+            };
         } catch {
             profileGraph = null;
         }
     }
-    if (options.withProfileGraph === true && !isFourKeyMania) {
+    if (options.withProfileGraph === true && !supportsFixedDensity) {
         try {
             const selectedSunnyGraph = selectedRework?.graph
                 && (actualEstimatorAlgorithm === "Sunny" || estimatorAlgorithm === "Sunny" || estimatorAlgorithm === "Companella")
@@ -367,10 +385,12 @@ export async function runAnalysisPipeline({ rawText, estimatorAlgorithm, options
     let fixedDensityValue = Number.NaN;
     let fixedDensityLnValue = Number.NaN;
     let fixedDensityError = null;
-    if (options.withFixedDensity && isFourKeyMania) {
+    if (options.withFixedDensity && supportsFixedDensity) {
         try {
             const fixedDensity = fixedDensityProfileResult
-                || calculateFixedDensity(parser, options.speedRate ?? 1);
+                || calculateFixedDensity(parser, options.speedRate ?? 1, {
+                    cvtFlag: options.cvtFlag ?? null,
+                });
             fixedDensityValue = fixedDensity.rcValue;
             fixedDensityLnValue = fixedDensity.lnValue;
         } catch (err) {

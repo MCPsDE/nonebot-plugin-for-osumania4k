@@ -3,6 +3,11 @@ export function isFourKeyMania(parsedInfo) {
         && Number(parsedInfo?.columnCount) === 4;
 }
 
+export function isFixedDensityMania(parsedInfo) {
+    return String(parsedInfo?.gameMode ?? "0") === "3"
+        && [4, 6, 7].includes(Number(parsedInfo?.columnCount));
+}
+
 export function resolveDifficultyText({
     supportsFixedDensity,
     srText,

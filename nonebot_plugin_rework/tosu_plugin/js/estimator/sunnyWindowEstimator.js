@@ -16,8 +16,14 @@ export function runSunnyWindowEstimatorFromText(osuText, options = {}, parsed = 
     const cvtFlag = options.cvtFlag ?? null;
     const withGraph = options.withGraph === true;
 
-    const rawResult = calculateSunny(osuText, speedRate, odFlag, cvtFlag, { withGraph }, parsed);
-    const parsedResult = normalizeReworkResult(rawResult);
+    // Pipeline 可能已经为同一谱面、同一组 Sunny 参数算过基础 Sunny 结果
+    // （星数归一化 / ppMetrics）。此时直接复用，省掉一次昂贵的 Sunny pass；
+    // 未传入时保持原行为，自行计算。
+    const precomputedSunny = options.precomputedSunnyResult;
+    const parsedResult =
+        precomputedSunny && Number.isFinite(Number(precomputedSunny.star))
+            ? precomputedSunny
+            : normalizeReworkResult(calculateSunny(osuText, speedRate, odFlag, cvtFlag, { withGraph }, parsed));
 
     const rawResultLN = calculateLN(osuText, speedRate, odFlag, cvtFlag, { withGraph, enableAnalyzeLN: options.enableAnalyzeLN === true }, parsed);
     const parsedLN = normalizeSunnyWindowResult(rawResultLN);

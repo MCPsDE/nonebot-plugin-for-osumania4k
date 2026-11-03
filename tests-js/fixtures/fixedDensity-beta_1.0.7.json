@@ -1,0 +1,522 @@
+{
+  "source": "Nick2357111/nonebot-plugin-for-osumania4k@cb9b218fe70e0f2fc8573790422e55e17631d3d4",
+  "algorithm": "beta_1.0.7 / RC v13",
+  "cases": [
+    {
+      "pattern": "mixed",
+      "rate": 0.75,
+      "cvtFlag": null,
+      "rcValue": -2.015704001262879,
+      "lnValue": 1.2461842875175768
+    },
+    {
+      "pattern": "mixed",
+      "rate": 0.75,
+      "cvtFlag": "IN",
+      "rcValue": -2.131946621855026,
+      "lnValue": 2.6283140446600473
+    },
+    {
+      "pattern": "mixed",
+      "rate": 0.75,
+      "cvtFlag": "HO",
+      "rcValue": -2.015704001263,
+      "lnValue": 0
+    },
+    {
+      "pattern": "mixed",
+      "rate": 0.75,
+      "cvtFlag": "INHO",
+      "rcValue": -2.131946621855026,
+      "lnValue": 0
+    },
+    {
+      "pattern": "mixed",
+      "rate": 1,
+      "cvtFlag": null,
+      "rcValue": 0.6035647210729934,
+      "lnValue": 1.9131120498027474
+    },
+    {
+      "pattern": "mixed",
+      "rate": 1,
+      "cvtFlag": "IN",
+      "rcValue": 0.4644588758409506,
+      "lnValue": 4.338255171383616
+    },
+    {
+      "pattern": "mixed",
+      "rate": 1,
+      "cvtFlag": "HO",
+      "rcValue": 0.6035647210729925,
+      "lnValue": 0
+    },
+    {
+      "pattern": "mixed",
+      "rate": 1,
+      "cvtFlag": "INHO",
+      "rcValue": 0.4644588758409506,
+      "lnValue": 0
+    },
+    {
+      "pattern": "mixed",
+      "rate": 1.5,
+      "cvtFlag": null,
+      "rcValue": 3.6698211061159363,
+      "lnValue": 3.4195016836700414
+    },
+    {
+      "pattern": "mixed",
+      "rate": 1.5,
+      "cvtFlag": "IN",
+      "rcValue": 3.506773110836289,
+      "lnValue": 7.728166667314339
+    },
+    {
+      "pattern": "mixed",
+      "rate": 1.5,
+      "cvtFlag": "HO",
+      "rcValue": 3.66982110611596,
+      "lnValue": 0
+    },
+    {
+      "pattern": "mixed",
+      "rate": 1.5,
+      "cvtFlag": "INHO",
+      "rcValue": 3.506773110836289,
+      "lnValue": 0
+    },
+    {
+      "pattern": "roll",
+      "rate": 0.75,
+      "cvtFlag": null,
+      "rcValue": 8.508791030186153,
+      "lnValue": 0
+    },
+    {
+      "pattern": "roll",
+      "rate": 0.75,
+      "cvtFlag": "IN",
+      "rcValue": 8.493351541135485,
+      "lnValue": 4.815130239851332
+    },
+    {
+      "pattern": "roll",
+      "rate": 0.75,
+      "cvtFlag": "HO",
+      "rcValue": 8.508791030186147,
+      "lnValue": 0
+    },
+    {
+      "pattern": "roll",
+      "rate": 0.75,
+      "cvtFlag": "INHO",
+      "rcValue": 8.493351541135485,
+      "lnValue": 0
+    },
+    {
+      "pattern": "roll",
+      "rate": 1,
+      "cvtFlag": null,
+      "rcValue": 11.556845425752455,
+      "lnValue": 0
+    },
+    {
+      "pattern": "roll",
+      "rate": 1,
+      "cvtFlag": "IN",
+      "rcValue": 11.542176158915446,
+      "lnValue": 7.559399154439934
+    },
+    {
+      "pattern": "roll",
+      "rate": 1,
+      "cvtFlag": "HO",
+      "rcValue": 11.556845425752469,
+      "lnValue": 0
+    },
+    {
+      "pattern": "roll",
+      "rate": 1,
+      "cvtFlag": "INHO",
+      "rcValue": 11.542176158915446,
+      "lnValue": 0
+    },
+    {
+      "pattern": "roll",
+      "rate": 1.5,
+      "cvtFlag": null,
+      "rcValue": 15.350887307982747,
+      "lnValue": 0
+    },
+    {
+      "pattern": "roll",
+      "rate": 1.5,
+      "cvtFlag": "IN",
+      "rcValue": 15.34364572461213,
+      "lnValue": 13.284847499122218
+    },
+    {
+      "pattern": "roll",
+      "rate": 1.5,
+      "cvtFlag": "HO",
+      "rcValue": 15.350887307982745,
+      "lnValue": 0
+    },
+    {
+      "pattern": "roll",
+      "rate": 1.5,
+      "cvtFlag": "INHO",
+      "rcValue": 15.34364572461213,
+      "lnValue": 0
+    },
+    {
+      "pattern": "crosshand",
+      "rate": 0.75,
+      "cvtFlag": null,
+      "rcValue": 8.118632185284842,
+      "lnValue": 0
+    },
+    {
+      "pattern": "crosshand",
+      "rate": 0.75,
+      "cvtFlag": "IN",
+      "rcValue": 8.100951495895615,
+      "lnValue": 4.530030905172952
+    },
+    {
+      "pattern": "crosshand",
+      "rate": 0.75,
+      "cvtFlag": "HO",
+      "rcValue": 8.118632185284744,
+      "lnValue": 0
+    },
+    {
+      "pattern": "crosshand",
+      "rate": 0.75,
+      "cvtFlag": "INHO",
+      "rcValue": 8.100951495895615,
+      "lnValue": 0
+    },
+    {
+      "pattern": "crosshand",
+      "rate": 1,
+      "cvtFlag": null,
+      "rcValue": 13.43759888684969,
+      "lnValue": 0
+    },
+    {
+      "pattern": "crosshand",
+      "rate": 1,
+      "cvtFlag": "IN",
+      "rcValue": 13.427828954952451,
+      "lnValue": 7.112538936589211
+    },
+    {
+      "pattern": "crosshand",
+      "rate": 1,
+      "cvtFlag": "HO",
+      "rcValue": 13.437598886849756,
+      "lnValue": 0
+    },
+    {
+      "pattern": "crosshand",
+      "rate": 1,
+      "cvtFlag": "INHO",
+      "rcValue": 13.427828954952451,
+      "lnValue": 0
+    },
+    {
+      "pattern": "crosshand",
+      "rate": 1.5,
+      "cvtFlag": null,
+      "rcValue": 17.42401255194972,
+      "lnValue": 0
+    },
+    {
+      "pattern": "crosshand",
+      "rate": 1.5,
+      "cvtFlag": "IN",
+      "rcValue": 17.415203177008703,
+      "lnValue": 12.544452474853006
+    },
+    {
+      "pattern": "crosshand",
+      "rate": 1.5,
+      "cvtFlag": "HO",
+      "rcValue": 17.424012551949716,
+      "lnValue": 0
+    },
+    {
+      "pattern": "crosshand",
+      "rate": 1.5,
+      "cvtFlag": "INHO",
+      "rcValue": 17.415203177008703,
+      "lnValue": 0
+    },
+    {
+      "pattern": "rc",
+      "rate": 0.75,
+      "cvtFlag": null,
+      "rcValue": -2.0157040012628826,
+      "lnValue": 0
+    },
+    {
+      "pattern": "rc",
+      "rate": 0.75,
+      "cvtFlag": "IN",
+      "rcValue": -2.131946621855026,
+      "lnValue": 2.6283140446600473
+    },
+    {
+      "pattern": "rc",
+      "rate": 0.75,
+      "cvtFlag": "HO",
+      "rcValue": -2.015704001263,
+      "lnValue": 0
+    },
+    {
+      "pattern": "rc",
+      "rate": 0.75,
+      "cvtFlag": "INHO",
+      "rcValue": -2.131946621855026,
+      "lnValue": 0
+    },
+    {
+      "pattern": "rc",
+      "rate": 1,
+      "cvtFlag": null,
+      "rcValue": 0.6035647210729934,
+      "lnValue": 0
+    },
+    {
+      "pattern": "rc",
+      "rate": 1,
+      "cvtFlag": "IN",
+      "rcValue": 0.4644588758409506,
+      "lnValue": 4.338255171383616
+    },
+    {
+      "pattern": "rc",
+      "rate": 1,
+      "cvtFlag": "HO",
+      "rcValue": 0.6035647210729925,
+      "lnValue": 0
+    },
+    {
+      "pattern": "rc",
+      "rate": 1,
+      "cvtFlag": "INHO",
+      "rcValue": 0.4644588758409506,
+      "lnValue": 0
+    },
+    {
+      "pattern": "rc",
+      "rate": 1.5,
+      "cvtFlag": null,
+      "rcValue": 3.6698211061159363,
+      "lnValue": 0
+    },
+    {
+      "pattern": "rc",
+      "rate": 1.5,
+      "cvtFlag": "IN",
+      "rcValue": 3.506773110836289,
+      "lnValue": 7.728166667314339
+    },
+    {
+      "pattern": "rc",
+      "rate": 1.5,
+      "cvtFlag": "HO",
+      "rcValue": 3.66982110611596,
+      "lnValue": 0
+    },
+    {
+      "pattern": "rc",
+      "rate": 1.5,
+      "cvtFlag": "INHO",
+      "rcValue": 3.506773110836289,
+      "lnValue": 0
+    },
+    {
+      "pattern": "ln",
+      "rate": 0.75,
+      "cvtFlag": null,
+      "rcValue": -2.01570400126288,
+      "lnValue": 2.2506103363300864
+    },
+    {
+      "pattern": "ln",
+      "rate": 0.75,
+      "cvtFlag": "IN",
+      "rcValue": -2.131946621855026,
+      "lnValue": 2.6283140446600473
+    },
+    {
+      "pattern": "ln",
+      "rate": 0.75,
+      "cvtFlag": "HO",
+      "rcValue": -2.015704001263,
+      "lnValue": 0
+    },
+    {
+      "pattern": "ln",
+      "rate": 0.75,
+      "cvtFlag": "INHO",
+      "rcValue": -2.131946621855026,
+      "lnValue": 0
+    },
+    {
+      "pattern": "ln",
+      "rate": 1,
+      "cvtFlag": null,
+      "rcValue": 0.6035647210729934,
+      "lnValue": 3.8035030568105475
+    },
+    {
+      "pattern": "ln",
+      "rate": 1,
+      "cvtFlag": "IN",
+      "rcValue": 0.4644588758409506,
+      "lnValue": 4.338255171383616
+    },
+    {
+      "pattern": "ln",
+      "rate": 1,
+      "cvtFlag": "HO",
+      "rcValue": 0.6035647210729925,
+      "lnValue": 0
+    },
+    {
+      "pattern": "ln",
+      "rate": 1,
+      "cvtFlag": "INHO",
+      "rcValue": 0.4644588758409506,
+      "lnValue": 0
+    },
+    {
+      "pattern": "ln",
+      "rate": 1.5,
+      "cvtFlag": null,
+      "rcValue": 3.6698211061159363,
+      "lnValue": 7.0667220574994385
+    },
+    {
+      "pattern": "ln",
+      "rate": 1.5,
+      "cvtFlag": "IN",
+      "rcValue": 3.506773110836289,
+      "lnValue": 7.728166667314339
+    },
+    {
+      "pattern": "ln",
+      "rate": 1.5,
+      "cvtFlag": "HO",
+      "rcValue": 3.66982110611596,
+      "lnValue": 0
+    },
+    {
+      "pattern": "ln",
+      "rate": 1.5,
+      "cvtFlag": "INHO",
+      "rcValue": 3.506773110836289,
+      "lnValue": 0
+    },
+    {
+      "keys": 6,
+      "pattern": "mixed",
+      "rate": 0.75,
+      "cvtFlag": null,
+      "rcValue": -8.671558287855614,
+      "lnValue": 1.9546189410767973
+    },
+    {
+      "keys": 6,
+      "pattern": "mixed",
+      "rate": 0.75,
+      "cvtFlag": "IN",
+      "rcValue": -8.99549246622722,
+      "lnValue": 1.3952145276398868
+    },
+    {
+      "keys": 6,
+      "pattern": "mixed",
+      "rate": 1,
+      "cvtFlag": null,
+      "rcValue": -4.613724038245852,
+      "lnValue": 3.2445553890742205
+    },
+    {
+      "keys": 6,
+      "pattern": "mixed",
+      "rate": 1,
+      "cvtFlag": "IN",
+      "rcValue": -4.951663977749682,
+      "lnValue": 2.4873581827062847
+    },
+    {
+      "keys": 6,
+      "pattern": "mixed",
+      "rate": 1.5,
+      "cvtFlag": null,
+      "rcValue": 0.5089609597763481,
+      "lnValue": 6.189541032084019
+    },
+    {
+      "keys": 6,
+      "pattern": "mixed",
+      "rate": 1.5,
+      "cvtFlag": "IN",
+      "rcValue": 0.22918010408190156,
+      "lnValue": 5.260269648903931
+    },
+    {
+      "keys": 7,
+      "pattern": "mixed",
+      "rate": 0.75,
+      "cvtFlag": null,
+      "rcValue": -8.208782592481535,
+      "lnValue": 0.7102260141871536
+    },
+    {
+      "keys": 7,
+      "pattern": "mixed",
+      "rate": 0.75,
+      "cvtFlag": "IN",
+      "rcValue": -8.501114950353319,
+      "lnValue": 0.9438574897628946
+    },
+    {
+      "keys": 7,
+      "pattern": "mixed",
+      "rate": 1,
+      "cvtFlag": null,
+      "rcValue": -5.098290488614832,
+      "lnValue": 1.2414474500603296
+    },
+    {
+      "keys": 7,
+      "pattern": "mixed",
+      "rate": 1,
+      "cvtFlag": "IN",
+      "rcValue": -5.416980951463911,
+      "lnValue": 1.7211639688850193
+    },
+    {
+      "keys": 7,
+      "pattern": "mixed",
+      "rate": 1.5,
+      "cvtFlag": null,
+      "rcValue": -0.676877011884136,
+      "lnValue": 2.647278861546858
+    },
+    {
+      "keys": 7,
+      "pattern": "mixed",
+      "rate": 1.5,
+      "cvtFlag": "IN",
+      "rcValue": -1.0461024791100164,
+      "lnValue": 3.834799789964734
+    }
+  ]
+}

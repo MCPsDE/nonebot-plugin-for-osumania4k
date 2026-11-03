@@ -693,7 +693,7 @@ function setStarLabel(element, text) {
 // Fixed Density v1：value 尺度约为 0~19，与 6K 定数同为“档位”尺度，复用同一
 // value→star 颜色映射（LV 5→SR 1，LV 23→SR 10，低于 LV 5 夹到 SR 1）。
 // 角标（data-unit）由调用方通过 setLeftCapsuleUnitBadge 设置。
-export function showFixedDensityValue(fixedDensityValue) {
+export function showFixedDensityValue(fixedDensityValue, keyCount) {
     reworkStarEl.classList.remove("category-mode");
     // 简单谱可算出负 value，需允许负值显示（不做 0 钳制）。
     animateNumericCapsuleValue(reworkStarEl, fixedDensityValue, undefined, undefined, undefined, true);
@@ -707,11 +707,11 @@ export function showFixedDensityValue(fixedDensityValue) {
     reworkStarEl.style.textShadow = "none";
     reworkStarEl.classList.remove("high-contrast");
     syncLeftUnitBadgeContrast(starText);
-    setStarLabel(fixedDensityRcLabelEl, fixedDensityRcLabel(value));
+    setStarLabel(fixedDensityRcLabelEl, fixedDensityRcLabel(value, keyCount));
 }
 
 // Fixed Density v1 的 ln_value：并排显示在 rc_value 右侧的第二框（角标 LN）。
-export function showFixedDensityLnValue(fixedDensityLnValue) {
+export function showFixedDensityLnValue(fixedDensityLnValue, keyCount) {
     if (!fixedDensityLnEl) {
         return;
     }
@@ -736,7 +736,7 @@ export function showFixedDensityLnValue(fixedDensityLnValue) {
     syncLeftUnitBadgeContrast(starText, fixedDensityLnEl);
     fixedDensityLnEl.classList.add("has-unit");
     fixedDensityLnEl.setAttribute("data-unit", "LN");
-    setStarLabel(fixedDensityLnLabelEl, fixedDensityLnLabel(value));
+    setStarLabel(fixedDensityLnLabelEl, fixedDensityLnLabel(value, keyCount));
 }
 
 // 非 Fixed Density 模式：隐藏 ln_value 第二框与两处文字说明，并复位并排布局。

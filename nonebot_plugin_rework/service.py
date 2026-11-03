@@ -43,7 +43,7 @@ HELP_TEXT = (
     "/rework2 <osu! 链接>   支持官网谱面 / 谱包链接\n"
     "回复一条谱面文件并发送 /rework2\n"
     "  支持 .osu / .osz / .mc / .mcz，以及内含它们的 .zip（可嵌套）\n"
-    "（所有 osu! 模式均可生成卡片；RC/LN 固定密度仅对 4K mania 显示）"
+    "（所有 osu! 模式均可生成卡片；RC/LN 固定密度对 4K/6K/7K mania 显示）"
 )
 
 _ID_RE = re.compile(r"^\d+$")
@@ -493,6 +493,9 @@ class ReworkService:
                     f"cvt:{command.cvt_flag}",
                 ]
             )
+            if info.mode == 3 and info.column_count in (4, 6, 7):
+                # New assignment charts must not reuse the previous Sunny PNGs.
+                render_variant += "|fd:beta_1.0.7|charts:4-6-7k"
             chart_key = self.cache.key_for(beatmap_file.text, render_variant)
             cached = self.cache.get_image(chart_key)
             if cached is not None:

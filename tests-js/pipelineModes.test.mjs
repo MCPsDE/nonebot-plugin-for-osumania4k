@@ -1,6 +1,21 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { runAnalysisPipeline } from "../nonebot_plugin_rework/tosu_plugin/js/pipeline/runAnalysisPipeline.js";
+import { calculateFixedDensity } from "../nonebot_plugin_rework/tosu_plugin/js/fixedDensity/index.js";
+import { createResultCache } from "../nonebot_plugin_rework/tosu_plugin/js/app/resultCache.js";
+import { makeManiaBeatmap } from "./fixtures/maniaBeatmap.mjs";
+
+function assertClose(actual, expected, path = "result") {
+    if (typeof expected === "number") {
+        // Upstream's Newton inverse warm-starts from the last call, with 1e-13 tolerance.
+        assert.ok(Math.abs(actual - expected) <= 1e-9 * Math.max(1, Math.abs(expected)), path);
+    } else if (expected && typeof expected === "object") {
+        assert.deepEqual(Object.keys(actual), Object.keys(expected), path);
+        for (const key of Object.keys(expected)) assertClose(actual[key], expected[key], `${path}.${key}`);
+    } else {
+        assert.equal(actual, expected, path);
+    }
+}
 
 function makeBeatmap({ mode, keys = null, objects = null }) {
     const lines = [
@@ -37,7 +52,7 @@ test("non-mania maps return card metadata without running mania estimators", asy
     assert.deepEqual(result.errors, []);
 });
 
-test("non-4K mania maps use SunnyRework profile data without Fixed Density", async () => {
+test("5K mania maps use SunnyRework profile data without Fixed Density", async () => {
     const result = await runAnalysisPipeline({
         rawText: makeBeatmap({ mode: 3, keys: 5 }),
         estimatorAlgorithm: "Sunny",
@@ -55,19 +70,42 @@ test("non-4K mania maps use SunnyRework profile data without Fixed Density", asy
     assert.deepEqual(result.errors, []);
 });
 
-test("4K mania maps keep the Fixed Density RC/LN profile", async () => {
-    const result = await runAnalysisPipeline({
-        rawText: makeBeatmap({
-            mode: 3,
-            keys: 4,
-            objects: Array.from({ length: 20 }, (_, index) =>
-                `${64 + (index % 4) * 128},192,${1000 + index * 500},1,0,0:0:0:0:`),
-        }),
-        estimatorAlgorithm: "Sunny",
-        options: { withProfileGraph: true },
+for (const keys of [4, 6, 7]) {
+    test(`${keys}K charts and capsule values use upstream assignment data across rates and conversions`, async () => {
+        const rawText = makeManiaBeatmap({ keys });
+        for (const speedRate of [0.75, 1, 1.5]) {
+            for (const cvtFlag of [null, "IN", "HO", "INHO"]) {
+                const options = { withFixedDensity: true, withProfileGraph: true, speedRate, cvtFlag };
+                const result = await runAnalysisPipeline({ rawText, estimatorAlgorithm: "Sunny", options });
+                const upstream = calculateFixedDensity(rawText, speedRate, { cvtFlag });
+                assertClose(result.fixedDensityValue, upstream.rcValue);
+                assertClose(result.fixedDensityLnValue, upstream.lnValue);
+                assertClose(result.profileGraph, {
+                    source: "FixedDensity", keyCount: keys,
+                    rc: upstream.rcSequence, ln: upstream.lnSequence,
+                    rcTicks: upstream.rcTicks, lnTicks: upstream.lnTicks,
+                    rcAnchor: Number.isFinite(upstream.rcAnchor?.raw) ? upstream.rcAnchor : null,
+                    lnAnchor: Number.isFinite(upstream.lnAnchor?.raw) ? upstream.lnAnchor : null,
+                });
+                const cache = createResultCache();
+                cache.put("fixture", result);
+                assert.deepEqual(cache.get("fixture").profileGraph, result.profileGraph);
+                assert.deepEqual(JSON.parse(JSON.stringify(result.profileGraph)), result.profileGraph);
+            }
+        }
     });
+}
 
-    assert.equal(result.profileGraph?.source, undefined);
-    assert.ok(Array.isArray(result.profileGraph?.rcCenterValues));
-    assert.ok(Array.isArray(result.profileGraph?.lnValues));
+test("other key counts keep Sunny curves without Fixed Density values", async () => {
+    for (const keys of [1, 2, 3, 5, 9, 10, 18]) {
+        const result = await runAnalysisPipeline({
+            rawText: makeManiaBeatmap({ keys, pattern: keys === 10 ? "rc" : "mixed" }),
+            estimatorAlgorithm: "Sunny",
+            options: { withFixedDensity: true, withProfileGraph: true },
+        });
+        assert.equal(result.profileGraph.source, "SunnyRework", `${keys}K`);
+        assert.ok(result.profileGraph.values.every(Number.isFinite), `${keys}K`);
+        assert.equal(Number.isNaN(result.fixedDensityValue), true);
+        assert.equal(Number.isNaN(result.fixedDensityLnValue), true);
+    }
 });

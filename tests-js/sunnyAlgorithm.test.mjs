@@ -1,6 +1,5 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { calculateFixedDensityProfile } from "../nonebot_plugin_rework/tosu_plugin/js/fixedDensity/index.js";
 import { calculate } from "../nonebot_plugin_rework/tosu_plugin/js/rework/sunnyAlgorithm.js";
 
 const HEADER = [
@@ -63,19 +62,4 @@ test("Sunny returns finite graph values for same-time and sparse notes", () => {
     ]);
 
     assertFiniteResult(calculate(map, 1.2, null, null, { withGraph: true }));
-});
-
-test("Fixed Density LN profile samples release events after speed scaling", () => {
-    const objects = [];
-    for (let index = 0; index < 20; index += 1) {
-        const start = 1000 + index * 500;
-        objects.push(`64,192,${start},128,0,${start + 200}:0:0:0:`);
-    }
-
-    const result = calculateFixedDensityProfile(makeBeatmap(objects), 1.2);
-    assert.ok(result.profile);
-    assert.ok(result.profile.times.includes(1000));
-    assert.ok(result.profile.lnValues.every(Number.isFinite));
-    assert.ok(result.profile.lnValues.some((value, index, values) =>
-        index > 0 && value < values[index - 1] - 1e-9));
 });
