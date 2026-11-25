@@ -1251,7 +1251,6 @@ export async function fetchBeatmapFile(reason) {
             } else if (!supportsFixedDensity) {
                 showFixedDensityLnValue(Number.NaN);
             }
-            }
         } else if (state.srText === "ReworkPP") {
             let ppVal = getLatestPpValue();   // from livePp.js (max PP when idle, live PP in play)
             // livePp 的 cheap guard 在 max 模式下（选图/菜单）可能因 counts 不变而短路，

@@ -226,6 +226,12 @@ class _StaticHandler(SimpleHTTPRequestHandler):
     def log_message(self, fmt: str, *args: Any) -> None:  # noqa: A003
         logger.debug("static: " + fmt, *args)
 
+    def end_headers(self) -> None:
+        # 启用 cross-origin isolation，使 SharedArrayBuffer 可用（onnxruntime 多线程 wasm 依赖）
+        self.send_header("Cross-Origin-Opener-Policy", "same-origin")
+        self.send_header("Cross-Origin-Embedder-Policy", "require-corp")
+        super().end_headers()
+
     def _send_bytes(self, body: bytes, content_type: str, status: int = 200) -> None:
         self.send_response(status)
         self.send_header("Content-Type", content_type)
